@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<!-- v3.1 -->
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bingo de Futebol</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #111318;
+  --surface: #1c1f2e;
+  --surface2: #232637;
+  --border: rgba(255,255,255,0.09);
+  --border-h: rgba(255,255,255,0.2);
+  --green: #3ddc84;
+  --green-bg: rgba(61,220,132,0.12);
+  --red: #f05252;
+  --text: #eef0f7;
+  --muted: rgba(238,240,247,0.42);
+  --r: 10px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); }
+
+/* ─── SCREENS ─── */
+.screen { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+.screen.hidden { display:none; }
+
+/* ─── CHOOSE ─── */
+.choose-box { width:100%; max-width:400px; text-align:center; }
+.choose-ball { font-size:2.6rem; display:inline-block; animation:spin 10s linear infinite; margin-bottom:10px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.choose-title { font-family:'Bebas Neue',sans-serif; font-size:2.8rem; letter-spacing:4px; background:linear-gradient(135deg,var(--green),#a7f3c6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.choose-sub { font-size:.72rem; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin:5px 0 28px; }
+.choose-opts { display:flex; flex-direction:column; gap:9px; }
+.choose-btn { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 18px; cursor:pointer; display:flex; align-items:center; gap:14px; text-align:left; transition:all .18s; color:var(--text); width:100%; }
+.choose-btn:hover { border-color:var(--green); background:var(--surface2); transform:translateY(-2px); box-shadow:0 6px 20px rgba(61,220,132,.1); }
+.choose-icon { font-size:1.9rem; flex-shrink:0; width:40px; text-align:center; }
+.choose-name { font-family:'Bebas Neue',sans-serif; font-size:1.35rem; letter-spacing:2px; display:block; }
+.choose-desc { font-size:.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; display:block; margin-top:2px; }
+
+/* ─── GAME LAYOUT — compact centered card ─── */
+.game-wrap { width:100%; max-width:560px; padding:16px 14px 28px; }
+
+.top-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.g-title { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:3px; background:linear-gradient(135deg,var(--green),#a7f3c6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.top-right { display:flex; gap:8px; align-items:center; }
+.score-pill { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:4px 13px; font-size:.75rem; font-weight:600; color:var(--muted); }
+.score-pill strong { color:var(--green); }
+.btn-reset { background:transparent; border:1px solid var(--border); border-radius:20px; padding:4px 13px; font-size:.68rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; color:var(--muted); font-family:'DM Sans',sans-serif; transition:all .15s; }
+.btn-reset:hover { border-color:var(--border-h); color:var(--text); }
+
+/* ─── PLAYER BOX ─── */
+.player-box {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px 18px 12px;
+  margin-bottom:10px;
+  position:relative; overflow:hidden;
+}
+.player-box::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--green),transparent); animation:gl 2.5s ease-in-out infinite; }
+@keyframes gl { 0%,100%{opacity:.25} 50%{opacity:1} }
+.p-label { font-size:.58rem; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+.p-name { font-family:'Bebas Neue',sans-serif; font-size:clamp(1.5rem,5vw,2.2rem); letter-spacing:2px; text-transform:uppercase; line-height:1; }
+
+/* Timer */
+.t-row { display:flex; align-items:center; gap:8px; margin-top:9px; }
+.t-track { flex:1; height:3px; background:rgba(255,255,255,.07); border-radius:3px; overflow:hidden; }
+.t-fill { height:100%; border-radius:3px; background:var(--green); transition:width 1s linear, background .3s; }
+.t-fill.hot { background:var(--red); }
+.t-num { font-family:'Bebas Neue',sans-serif; font-size:.95rem; width:18px; text-align:right; color:var(--green); flex-shrink:0; line-height:1; }
+.t-num.hot { color:var(--red); }
+
+/* ─── BINGO GRID ─── */
+.g-hint { font-size:.58rem; letter-spacing:3px; text-transform:uppercase; color:var(--muted); text-align:center; margin-bottom:7px; }
+
+.bingo-grid {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:6px;
+}
+
+/* Each cell is a fixed square — size driven by container width */
+.cell {
+  background:var(--surface);
+  border:1.5px solid var(--border);
+  border-radius:var(--r);
+  cursor:pointer;
+  transition:all .15s;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px;
+  padding:6px 4px;
+  aspect-ratio:1/1;
+  user-select:none;
+  position:relative; overflow:hidden;
+}
+.cell:hover:not(.done) { border-color:var(--border-h); background:var(--surface2); transform:translateY(-1px); }
+.cell.done { background:var(--green-bg); border-color:var(--green); cursor:default; }
+.cell.done::after { content:'✓'; position:absolute; top:4px; right:6px; font-size:.55rem; color:var(--green); font-weight:900; opacity:.7; }
+.cell.wrong { animation:shk .35s ease; border-color:rgba(240,82,82,.6); background:rgba(240,82,82,.08); }
+.cell.wrong-perm { border-color:rgba(240,82,82,.5); background:rgba(240,82,82,.06); }
+@keyframes shk { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+
+/* Visual area inside cell */
+.c-vis { width:36px; height:36px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.c-vis img { width:34px; height:34px; object-fit:contain; display:block; }
+.c-vis img.bg-white { background:white; border-radius:5px; padding:3px; }
+.pl-badge {
+  background: linear-gradient(135deg, #38003c 0%, #560080 100%);
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  border-radius: 7px;
+  padding: 5px 8px;
+  line-height: 1;
+  border: 1.5px solid rgba(255,255,255,.35);
+  box-shadow: 0 0 10px rgba(120,0,200,.4);
+}
+.club-init {
+  width:36px; height:36px; background:var(--surface2); border:1px solid var(--border);
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:var(--green);
+}
+.pl-badge-sm {
+  font-size: .65rem;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.c-vis .c-flag { font-size:1.65rem; line-height:1; }
+.c-vis .c-emoji { font-size:1.5rem; line-height:1; }
+/* trophy+league combo */
+.c-trofeu { display:flex; align-items:center; gap:2px; }
+.c-trofeu .t-icon { font-size:1rem; }
+.c-trofeu img { width:20px; height:20px; object-fit:contain; }
+
+.c-text { font-size:clamp(.45rem,1.25vw,.62rem); font-weight:700; text-transform:uppercase; letter-spacing:.2px; text-align:center; line-height:1.2; color:rgba(238,240,247,.88); padding:0 2px; }
+.c-sub { font-size:clamp(.36rem,.95vw,.48rem); color:var(--green); font-weight:600; text-transform:uppercase; letter-spacing:.15px; text-align:center; line-height:1.1; padding:0 2px; }
+
+/* ─── NEXT BUTTON ─── */
+.actions { margin-top:10px; }
+.btn-next { width:100%; background:var(--green); color:#07150e; border:none; border-radius:var(--r); padding:11px; font-family:'DM Sans',sans-serif; font-size:.82rem; font-weight:800; letter-spacing:.5px; text-transform:uppercase; cursor:pointer; transition:all .15s; }
+.btn-next:hover { filter:brightness(1.08); transform:translateY(-1px); }
+.btn-next:disabled { opacity:.3; cursor:not-allowed; transform:none; filter:none; }
+
+/* ─── TOAST ─── */
+.toast { position:fixed; top:14px; left:50%; transform:translateX(-50%) translateY(-70px); background:var(--surface2); border:1px solid var(--border); border-radius:50px; padding:9px 20px; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; transition:transform .3s cubic-bezier(.34,1.56,.64,1); z-index:999; white-space:nowrap; box-shadow:0 5px 24px rgba(0,0,0,.5); }
+.toast.show { transform:translateX(-50%) translateY(0); }
+.toast.ok { border-color:rgba(61,220,132,.4); color:var(--green); }
+.toast.err { border-color:rgba(240,82,82,.4); color:var(--red); }
+
+/* ─── MODAL ─── */
+.overlay { position:fixed; inset:0; background:rgba(5,6,12,.87); backdrop-filter:blur(10px); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .25s; }
+.overlay.show { opacity:1; pointer-events:all; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:32px 24px; text-align:center; max-width:340px; width:100%; transform:scale(.9); transition:transform .3s cubic-bezier(.34,1.56,.64,1); }
+.overlay.show .modal { transform:scale(1); }
+.modal-icon { font-size:3rem; margin-bottom:8px; }
+.modal-title { font-family:'Bebas Neue',sans-serif; font-size:2.2rem; letter-spacing:3px; background:linear-gradient(135deg,var(--green),#a7f3c6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:6px; }
+.modal-desc { color:var(--muted); font-size:.84rem; line-height:1.6; margin-bottom:18px; }
+.modal-stats { display:flex; gap:8px; margin-bottom:20px; }
+.mstat { flex:1; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:9px; padding:10px 6px; }
+.mstat-n { font-family:'Bebas Neue',sans-serif; font-size:1.9rem; color:var(--green); line-height:1; }
+.mstat-l { font-size:.58rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-top:2px; }
+.modal-btns { display:flex; gap:8px; }
+.mbtn { flex:1; padding:9px; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:.76rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; border:none; transition:all .15s; }
+.mbtn-p { background:var(--green); color:#07150e; }
+.mbtn-p:hover { filter:brightness(1.1); }
+.mbtn-s { background:transparent; color:var(--muted); border:1px solid var(--border); }
+.mbtn-s:hover { color:var(--text); border-color:var(--border-h); }
+
+@media(max-width:420px) {
+  .c-vis { width:28px; height:28px; }
+  .c-vis img { width:26px; height:26px; }
+  .c-vis .c-flag { font-size:1.3rem; }
+}
+
+/* ─── DAILY CHALLENGE ─── */
+.daily-banner {
+  background: linear-gradient(135deg, #1a2a1a, #0d1f0d);
+  border: 1px solid rgba(61,220,132,.3);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.daily-banner::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--green), transparent);
+}
+.daily-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.daily-label { font-size: .58rem; letter-spacing: 3px; text-transform: uppercase; color: var(--green); font-weight: 700; }
+.daily-date { font-size: .62rem; color: var(--muted); letter-spacing: 1px; }
+.daily-streak { display: flex; align-items: center; gap: 6px; }
+.streak-fire { font-size: 1.1rem; }
+.streak-num { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--green); line-height: 1; }
+.streak-lbl { font-size: .6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.daily-result-row { display: flex; gap: 3px; margin-top: 8px; flex-wrap: wrap; }
+.daily-dot {
+  width: 14px; height: 14px; border-radius: 3px;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+}
+.daily-dot.hit { background: var(--green); border-color: var(--green); }
+.daily-dot.miss { background: var(--red); border-color: var(--red); opacity: .7; }
+.daily-dot.skip { background: rgba(255,255,255,.15); border-color: rgba(255,255,255,.2); }
+.daily-share-btn {
+  margin-top: 10px; width: 100%;
+  background: rgba(61,220,132,.12); border: 1px solid rgba(61,220,132,.3);
+  border-radius: 8px; padding: 8px; font-family: 'DM Sans', sans-serif;
+  font-size: .72rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  cursor: pointer; color: var(--green); transition: all .15s;
+}
+.daily-share-btn:hover { background: rgba(61,220,132,.2); }
+.daily-completed-msg { font-size: .78rem; color: var(--green); text-align: center; margin-top: 8px; font-weight: 600; }
+
+.choose-btn.daily-btn { border-color: rgba(61,220,132,.4); background: linear-gradient(135deg, rgba(61,220,132,.08), rgba(61,220,132,.03)); }
+.choose-btn.daily-btn:hover { border-color: var(--green); background: linear-gradient(135deg, rgba(61,220,132,.18), rgba(61,220,132,.08)); }
+.daily-badge { background: var(--green); color: #07150e; font-size: .55rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; padding: 2px 7px; border-radius: 10px; margin-left: 8px; }
+.mode-divider { text-align: center; font-size: .62rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin: 10px 0 8px; }
+
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODAL FIM -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <div class="modal-icon" id="mi">🏆</div>
+    <div class="modal-title" id="mt">BINGO!</div>
+    <div class="modal-desc" id="md"></div>
+    <div class="modal-stats">
+      <div class="mstat"><div class="mstat-n" id="ms-m">0</div><div class="mstat-l">Marcados</div></div>
+      <div class="mstat"><div class="mstat-n" id="ms-j">0</div><div class="mstat-l">Jogadores</div></div>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-p" onclick="voltarEscolha()">Novo Jogo</button>
+      <button class="mbtn mbtn-s" onclick="closeModal()">Ver Cartela</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHOOSE SCREEN -->
+<div class="screen" id="screen-choose">
+  <div class="choose-box">
+    <div class="choose-ball">⚽</div>
+    <div class="choose-title">Bingo de Futebol</div>
+    <div class="choose-sub">Escolhe o modo de jogo</div>
+    <div class="choose-opts">
+      <button class="choose-btn daily-btn" onclick="startDailyGame()">
+        <div class="choose-icon">📅</div>
+        <div>
+          <span class="choose-name">Desafio Diário <span class="daily-badge" id="daily-badge">HOJE</span></span>
+          <span class="choose-desc" id="daily-choose-desc">Cartela igual para toda a gente</span>
+        </div>
+      </button>
+      <div class="mode-divider">— ou jogo livre —</div>
+      <button class="choose-btn" onclick="startGame(false)">
+        <div class="choose-icon">♾️</div>
+        <div>
+          <span class="choose-name">Sem Limite de Tempo</span>
+          <span class="choose-desc">Cartela aleatória, sem pressão</span>
+        </div>
+      </button>
+      <button class="choose-btn" onclick="startGame(true)">
+        <div class="choose-icon">⏱️</div>
+        <div>
+          <span class="choose-name">10 Segundos</span>
+          <span class="choose-desc">10s por jogador — passa automaticamente</span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div class="screen hidden" id="screen-game">
+  <div class="game-wrap">
+    <div class="top-bar">
+      <div class="g-title">⚽ Bingo de Futebol</div>
+      <div class="top-right">
+        <div class="score-pill"><strong id="sc-m">0</strong>/16</div><div class="score-pill" id="sc-jogador-pill"><strong id="sc-j">—</strong>/<span id="sc-total">—</span></div>
+        <button class="btn-reset" onclick="voltarEscolha()">↺ Novo</button>
+      </div>
+    </div>
+
+    <div id="daily-game-banner" class="daily-banner" style="display:none">
+      <div class="daily-top">
+        <div>
+          <div class="daily-label">📅 Desafio Diário</div>
+          <div class="daily-date" id="daily-display-date"></div>
+        </div>
+        <div class="daily-streak">
+          <span class="streak-fire">🔥</span>
+          <span class="streak-num" id="streak-num">0</span>
+          <span class="streak-lbl">dias</span>
+        </div>
+      </div>
+      <div class="daily-result-row" id="daily-dots"></div>
+    </div>
+    <div class="player-box">
+      <div class="p-label">Jogador Atual</div>
+      <div class="p-name" id="player-name">—</div>
+      <div id="timer-row" class="t-row" style="display:none">
+        <div class="t-track"><div class="t-fill" id="tfill"></div></div>
+        <div class="t-num" id="tnum">10</div>
+      </div>
+    </div>
+
+    <div class="g-hint">Seleciona a categoria correta</div>
+    <div class="bingo-grid" id="grid"></div>
+
+    <div class="actions">
+      <button class="btn-next" id="btn-next" onclick="nextPlayer()">Próximo Jogador ›</button>
+    </div>
+  </div>
+</div>
+
+<script>const CLUB_LOGOS = {
+  "AC Milan": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjRkIwOTEzIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8cGF0aCBkPSJNNSA1MCBBNDUgNDUgMCAwIDEgNTAgNSBMNTAgOTUgQTQ1IDQ1IDAgMCAxIDUgNTBaIiBmaWxsPSIjRkIwOTEzIi8+CiAgPHBhdGggZD0iTTUwIDUgQTQ1IDQ1IDAgMCAxIDk1IDUwIEE0NSA0NSAwIDAgMSA1MCA5NVoiIGZpbGw9IiMwMDAiLz4KICA8cmVjdCB4PSIyMCIgeT0iMjUiIHdpZHRoPSIxMiIgaGVpZ2h0PSI1MCIgZmlsbD0iI0ZCMDkxMyIvPgogIDxyZWN0IHg9IjQ0IiB5PSIyNSIgd2lkdGg9IjEyIiBoZWlnaHQ9IjUwIiBmaWxsPSIjRkIwOTEzIi8+CiAgPHJlY3QgeD0iNjgiIHk9IjI1IiB3aWR0aD0iMTIiIGhlaWdodD0iNTAiIGZpbGw9IiNGQjA5MTMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkIwOTEzIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+",
+  "Ajax": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iI0QyMTIyRSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iI0QyMTIyRSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2IiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5BSkFYPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI2MyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOCIgZmlsbD0iI2ZmZiI+QU1TVEVSREFNPC90ZXh0Pgo8L3N2Zz4=",
+  "Al-Hilal": {bg:"#0000FF",fg:"#FFFFFF",t:"ALH"},
+  "Al-Ittihad": {bg:"#FFD700",fg:"#000000",t:"ALI"},
+  "Al-Nassr": {bg:"#F5D107",fg:"#002160",t:"ALN"},
+  "Arsenal": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cGF0aCBkPSJNNTAgNSBDNzUgNSA5NSAyNSA5NSA1MCBDOTUgNzUgNzUgOTUgNTAgOTUgQzI1IDk1IDUgNzUgNSA1MCBDNSAyNSAyNSA1IDUwIDVaIiBmaWxsPSIjRUYwMTA3Ii8+CiAgPHRleHQgeD0iNTAiIHk9IjQzIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+QVJTRU5BTDwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjkiIGZpbGw9IiNmZmYiPkYuQy48L3RleHQ+CiAgPHBhdGggZD0iTTIwIDY4IEw4MCA2OCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEuNSIvPgogIDx0ZXh0IHg9IjUwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNyIgZmlsbD0iI2ZmZiI+TE9ORE9OPC90ZXh0Pgo8L3N2Zz4=",
+  "Atalanta": {bg:"#1C4799",fg:"#000000",t:"ATA"},
+  "Atl\\u00e9tico Madrid": {bg:"#CE3524",fg:"#272727",t:"ATM"},
+  "Atl\u00e9tico Madrid": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cGF0aCBkPSJNNTAgNSBRNzggNSA5MCAyMCBMOTAgNjUgUTgwIDkyIDUwIDk3IFEyMCA5MiAxMCA2NSBMMTAgMjAgUTIyIDUgNTAgNVoiIGZpbGw9IiNDRTM1MjQiLz4KICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgZmlsbD0iI0NFMzUyNCIvPgogIDxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMyIvPgogIDxyZWN0IHg9IjIwIiB5PSIyMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjZmZmIi8+CiAgPHJlY3QgeD0iMjAiIHk9IjcwIiB3aWR0aD0iNjAiIGhlaWdodD0iMTAiIGZpbGw9IiNmZmYiLz4KICA8dGV4dCB4PSI1MCIgeT0iNTYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5BVE08L3RleHQ+Cjwvc3ZnPg==",
+  "Barcelona": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cGF0aCBkPSJNNTAgNSBRODAgOCA5MCAyMCBMOTAgNjAgUTg1IDg1IDUwIDk3IFExNSA4NSAxMCA2MCBMMTAgMjAgUTIwIDggNTAgNVoiIGZpbGw9IiNBNTAwNDQiIHN0cm9rZT0iIzAwNEQ5OCIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPHJlY3QgeD0iMjIiIHk9IjE4IiB3aWR0aD0iNTYiIGhlaWdodD0iOCIgZmlsbD0iI0Y3RDExNyIvPgogIDxyZWN0IHg9IjIyIiB5PSIyNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjgiIGZpbGw9IiNBNTAwNDQiLz4KICA8cmVjdCB4PSIyMiIgeT0iMTgiIHdpZHRoPSIyMCIgaGVpZ2h0PSIxNiIgZmlsbD0iIzAwNEQ5OCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI2MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmYiPkZDQjwvdGV4dD4KICA8cmVjdCB4PSIyMiIgeT0iMzQiIHdpZHRoPSIyNiIgaGVpZ2h0PSIyMiIgZmlsbD0iI0E1MDA0NCIvPgogIDxyZWN0IHg9IjQ4IiB5PSIzNCIgd2lkdGg9IjMwIiBoZWlnaHQ9IjIyIiBmaWxsPSIjRjdEMTE3Ii8+Cjwvc3ZnPg==",
+  "Bayer Leverkusen": {bg:"#E32221",fg:"#000000",t:"B04"},
+  "Bayern Munich": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iI0RDMDUyRCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNiIgZmlsbD0iI2ZmZiIvPgogIDxyZWN0IHg9IjMyIiB5PSIzMiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiBmaWxsPSIjREMwNTJEIi8+CiAgPHJlY3QgeD0iNTAiIHk9IjUwIiB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIGZpbGw9IiNEQzA1MkQiLz4KICA8cmVjdCB4PSI1MCIgeT0iMzIiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgZmlsbD0iIzAwNjZCMiIvPgogIDxyZWN0IHg9IjMyIiB5PSI1MCIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiBmaWxsPSIjMDA2NkIyIi8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMzYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0RDMDUyRCIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjIiIGZpbGw9IiNEQzA1MkQiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjkiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmYiPkZDPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI1OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOSIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+QkFZRVJOPC90ZXh0Pgo8L3N2Zz4=",
+  "Benfica": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iI0NDMDAwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNSIgZmlsbD0iI0NDMDAwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEuNSIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTAiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmYiPlNMPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI1NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmYiPkJFTkZJQ0E8L3RleHQ+CiAgPHBhdGggZD0iTTI1IDY4IFE1MCA3OCA3NSA2OCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+",
+  "Besiktas": {bg:"#000000",fg:"#FFFFFF",t:"BJK"},
+  "Blackburn": {bg:"#009EE0",fg:"#FFFFFF",t:"BRFC"},
+  "Boca Juniors": {bg:"#003087",fg:"#F7C200",t:"BOCA"},
+  "Bordeaux": {bg:"#00305B",fg:"#FFFFFF",t:"GIR"},
+  "Botafogo": {bg:"#000000",fg:"#FFFFFF",t:"BOT"},
+  "Celtic": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzAxNjI0MSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iI2ZmZiIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiMwMTYyNDEiPkNGQzwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNjMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjkiIGZpbGw9IiMwMTYyNDEiPkNFTFRJQzwvdGV4dD4KPC9zdmc+",
+  "Chelsea": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzAzNDY5NCIgc3Ryb2tlPSIjREJBMTExIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMyIgZmlsbD0iIzAzNDY5NCIgc3Ryb2tlPSIjREJBMTExIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjREJBMTExIj5DRkM8L3RleHQ+CiAgPHRleHQgeD0iNTAiIHk9IjYyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI5IiBmaWxsPSIjZmZmIj5DSEVMU0VBPC90ZXh0Pgo8L3N2Zz4=",
+  "Corinthians": {bg:"#000000",fg:"#FFFFFF",t:"COR"},
+  "Deportivo": {bg:"#FFFFFF",fg:"#0047AB",t:"RCD"},
+  "Dortmund": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iI0ZERTEwMCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzAwMCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0MyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNGREUxMDAiPkJWQjwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNjIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjgiIGZpbGw9IiNGREUxMDAiPkRPUlRNVU5EPC90ZXh0Pgo8L3N2Zz4=",
+  "Dynamo Kyiv": {bg:"#00447C",fg:"#FFFFFF",t:"DK"},
+  "Everton": {bg:"#003399",fg:"#FFFFFF",t:"EFC"},
+  "Fenerbah\\u00e7e": {bg:"#FFED00",fg:"#003399",t:"FB"},
+  "Fiorentina": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzRCMDA4MiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzRCMDA4MiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEuNSIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0MyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOSIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+QUNGPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI2MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+RklPUkVOVElOQTwvdGV4dD4KPC9zdmc+",
+  "Flamengo": {bg:"#CC0000",fg:"#000000",t:"FLA"},
+  "Fluminense": {bg:"#8B0000",fg:"#FFFFFF",t:"FLU"},
+  "Galatasaray": {bg:"#CC0000",fg:"#F7A600",t:"GS"},
+  "Gr\\u00eamio": {bg:"#001B8E",fg:"#FFFFFF",t:"GRE"},
+  "Inter Miami": {bg:"#F7B5CD",fg:"#231F20",t:"IMC"},
+  "Inter Mil\\u00e3o": {bg:"#010E80",fg:"#000000",t:"INT"},
+  "Inter Mil\u00e3o": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzAxMEU4MCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8cGF0aCBkPSJNNTAgNSBBNDUgNDUgMCAwIDEgOTUgNTAgTDUwIDUwWiIgZmlsbD0iIzAwMCIvPgogIDxwYXRoIGQ9Ik01MCA1MCBBNDUgNDUgMCAwIDEgNSA1MCBMNTAgNVoiIGZpbGw9IiMwMDAiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIyOCIgZmlsbD0iIzAxMEU4MCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmYiPklOVEVSPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI2MiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iI2ZmZiI+TUlMQU5PPC90ZXh0Pgo8L3N2Zz4=",
+  "Juventus": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzAwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8cmVjdCB4PSIyMCIgeT0iMTUiIHdpZHRoPSIyOCIgaGVpZ2h0PSI3MCIgZmlsbD0iI2ZmZiIvPgogIDxyZWN0IHg9IjUyIiB5PSIxNSIgd2lkdGg9IjI4IiBoZWlnaHQ9IjcwIiBmaWxsPSIjMDAwIi8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPHRleHQgeD0iNTAiIHk9IjU4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iR2VvcmdpYSxzZXJpZiIgZm9udC1zaXplPSIyOCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiNGRkQ3MDAiPko8L3RleHQ+Cjwvc3ZnPg==",
+  "LA Galaxy": {bg:"#00245D",fg:"#FFD700",t:"LAG"},
+  "Lazio": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzg3RDhGNyIgc3Ryb2tlPSIjMDAwMDgwIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzAwMDA4MCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0MyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiM4N0Q4RjciPlNTPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI2MiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiM4N0Q4RjciPkxBWklPPC90ZXh0Pgo8L3N2Zz4=",
+  "Leeds": {bg:"#FFCD00",fg:"#1D428A",t:"LUFC"},
+  "Leicester": {bg:"#003090",fg:"#FDBE11",t:"LCFC"},
+  "Liverpool": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8ZWxsaXBzZSBjeD0iNTAiIGN5PSI1MCIgcng9IjQ3IiByeT0iNDciIGZpbGw9IiNDODEwMkUiLz4KICA8ZWxsaXBzZSBjeD0iNTAiIGN5PSI1MCIgcng9IjM3IiByeT0iMzciIGZpbGw9IiNDODEwMkUiIHN0cm9rZT0iI0Y2RUI2MSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPHRleHQgeD0iNTAiIHk9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSI5IiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5MSVZFUjwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNTMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjkiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmYiPlBPT0w8L3RleHQ+CiAgPHRleHQgeD0iNTAiIHk9IjY4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSI4IiBmaWxsPSIjRjZFQjYxIj5GLkMuPC90ZXh0PgogIDxlbGxpcHNlIGN4PSI1MCIgY3k9IjUwIiByeD0iNDciIHJ5PSI0NyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRjZFQjYxIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+",
+  "Lyon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iI0NDMDAwMCIgc3Ryb2tlPSIjMDAzMzk5IiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzAwMzM5OSIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0MyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTMiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmYiPk9MPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI2MiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iI2ZmZiI+TFlPTjwvdGV4dD4KPC9zdmc+",
+  "Manchester City": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzZDQUJERCIgc3Ryb2tlPSIjMUMyQzVCIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNSIgZmlsbD0iIzFDMkM1QiIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0MyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOSIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzZDQUJERCI+TUFOPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI1NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOSIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzZDQUJERCI+Q0lUWTwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNjkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjciIGZpbGw9IiNmZmYiPkYuQy48L3RleHQ+Cjwvc3ZnPg==",
+  "Manchester United": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cGF0aCBkPSJNNTAgNSBRNzggNSA5MCAyMCBMOTAgNjUgUTgwIDkyIDUwIDk3IFEyMCA5MiAxMCA2NSBMMTAgMjAgUTIyIDUgNTAgNVoiIGZpbGw9IiNEQTI5MUMiLz4KICA8cGF0aCBkPSJNNTAgNSBRNzggNSA5MCAyMCBMOTAgNjUgUTgwIDkyIDUwIDk3IFEyMCA5MiAxMCA2NSBMMTAgMjAgUTIyIDUgNTAgNVoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZCRTEyMiIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPHRleHQgeD0iNTAiIHk9IjQyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSI5IiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5NQU5DSEVTVEVSPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI1NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOSIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+VU5JVEVEPC90ZXh0PgogIDxwYXRoIGQ9Ik0zMCA2NSBRNTAgNzUgNzAgNjUiIHN0cm9rZT0iI0ZCRTEyMiIgc3Ryb2tlLXdpZHRoPSIyIiBmaWxsPSJub25lIi8+Cjwvc3ZnPg==",
+  "Marseille": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzAwOUJERSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzAwOUJERSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5PTTwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNjIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjgiIGZpbGw9IiNmZmYiPk1BUlNFSUxMRTwvdGV4dD4KPC9zdmc+",
+  "Monaco": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iI0NDMDAwMSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iOTAiIGhlaWdodD0iNDUiIHJ4PSI0NSIgZmlsbD0iI0NDMDAwMSIvPgogIDxyZWN0IHg9IjUiIHk9IjUwIiB3aWR0aD0iOTAiIGhlaWdodD0iNDUiIHJ4PSI0NSIgZmlsbD0iI2ZmZiIvPgogIDxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ3IiBmaWxsPSJub25lIiBzdHJva2U9IiNDQzAwMDEiIHN0cm9rZS13aWR0aD0iMiIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmYiPkFTPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI2OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTAiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNDQzAwMDEiPk1PTkFDTzwvdGV4dD4KPC9zdmc+",
+  "Napoli": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzEyQTBDMyIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzEyQTBDMyIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5TU0M8L3RleHQ+CiAgPHRleHQgeD0iNTAiIHk9IjYwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMSIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+TkFQT0xJPC90ZXh0Pgo8L3N2Zz4=",
+  "New York City": {bg:"#6CABDD",fg:"#003087",t:"NYCFC"},
+  "New York Cosmos": {bg:"#005F3F",fg:"#FFFFFF",t:"NYC"},
+  "Newcastle": {bg:"#241F20",fg:"#FFFFFF",t:"NUFC"},
+  "PSG": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzAwNDE3MCIgc3Ryb2tlPSIjRDAwMDI3IiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzAwNDE3MCIgc3Ryb2tlPSIjRDAwMDI3IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5QU0c8L3RleHQ+CiAgPHRleHQgeD0iNTAiIHk9IjYyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI3IiBmaWxsPSIjRDAwMDI3Ij5QQVJJUzwvdGV4dD4KPC9zdmc+",
+  "PSV": {bg:"#CC0000",fg:"#FFFFFF",t:"PSV"},
+  "Parma": {bg:"#FFDD00",fg:"#003399",t:"PFC"},
+  "Porto": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cGF0aCBkPSJNNTAgNSBRNzggNSA5MCAyMCBMOTAgNjUgUTgwIDkyIDUwIDk3IFEyMCA5MiAxMCA2NSBMMTAgMjAgUTIyIDUgNTAgNVoiIGZpbGw9IiMwMDMwODciLz4KICA8cGF0aCBkPSJNNTAgNSBRNzggNSA5MCAyMCBMOTAgNjUgUTgwIDkyIDUwIDk3IFEyMCA5MiAxMCA2NSBMMTAgMjAgUTIyIDUgNTAgNVoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPHJlY3QgeD0iMjAiIHk9IjIwIiB3aWR0aD0iNjAiIGhlaWdodD0iMTIiIGZpbGw9IiNmZmYiLz4KICA8dGV4dCB4PSI1MCIgeT0iNTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5GQzwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNzQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjEwIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5QT1JUTzwvdGV4dD4KPC9zdmc+",
+  "Real Madrid": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0OCIgZmlsbD0iIzAwNTI5RiIgc3Ryb2tlPSIjRjdEMTE3IiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzOCIgZmlsbD0iIzAwNTI5RiIgc3Ryb2tlPSIjRjdEMTE3IiBzdHJva2Utd2lkdGg9IjEuNSIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjRjdEMTE3Ij5SRUFMPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI2MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjRjdEMTE3Ij5NQURSSUQ8L3RleHQ+CiAgPHRleHQgeD0iNTAiIHk9Ijc1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI5IiBmaWxsPSIjRjdEMTE3Ij5DLkYuPC90ZXh0Pgo8L3N2Zz4=",
+  "Real Sociedad": {bg:"#003087",fg:"#FFFFFF",t:"RSO"},
+  "Roma": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzhCMUQxRCIgc3Ryb2tlPSIjRjVDNTE4IiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzhCMUQxRCIgc3Ryb2tlPSIjRjVDNTE4IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjEzIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjRjVDNTE4Ij5BUzwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjEzIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjRjVDNTE4Ij5ST01BPC90ZXh0Pgo8L3N2Zz4=",
+  "S\\u00e3o Paulo": {bg:"#CC0000",fg:"#000000",t:"SPFC"},
+  "Saint-\\u00c9tienne": {bg:"#007A3D",fg:"#FFFFFF",t:"ASSE"},
+  "Santos": {bg:"#FFFFFF",fg:"#000000",t:"SAN"},
+  "Schalke": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzAwMzc4MiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzAwMzc4MiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5GQzwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjEwIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjZmZmIj5TQ0hBTEtFPC90ZXh0Pgo8L3N2Zz4=",
+  "Sevilla": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iI0QxMEExMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iI2ZmZiIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNEMTBBMTAiPlNGQzwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNjMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjkiIGZpbGw9IiNEMTBBMTAiPlNFVklMTEE8L3RleHQ+Cjwvc3ZnPg==",
+  "Sporting CP": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzAwNjYzMyIgc3Ryb2tlPSIjRkZENzAwIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzAwNjYzMyIgc3Ryb2tlPSIjRkZENzAwIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjRkZENzAwIj5TQ1A8L3RleHQ+CiAgPHRleHQgeD0iNTAiIHk9IjYwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI4IiBmaWxsPSIjZmZmIj5TUE9SVElORzwvdGV4dD4KPC9zdmc+",
+  "Sydney FC": {bg:"#005AA0",fg:"#FFFFFF",t:"SYD"},
+  "Torino": {bg:"#760000",fg:"#FFFFFF",t:"TOR"},
+  "Tottenham": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NyIgZmlsbD0iIzEzMjI1NyIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iIzEzMjI1NyIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEuNSIvPgogIDx0ZXh0IHg9IjUwIiB5PSI0MyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTAiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmYiPlNQVVJTPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI2MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNyIgZmlsbD0iI2ZmZiI+VE9UVEVOSEFNPC90ZXh0Pgo8L3N2Zz4=",
+  "Udinese": {bg:"#000000",fg:"#FFFFFF",t:"UDI"},
+  "Valencia": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cGF0aCBkPSJNNTAgNSBRNzggNSA5MCAyMCBMOTAgNjUgUTgwIDkyIDUwIDk3IFEyMCA5MiAxMCA2NSBMMTAgMjAgUTIyIDUgNTAgNVoiIGZpbGw9IiNGRjY2MDAiLz4KICA8cGF0aCBkPSJNNTAgNSBRNzggNSA5MCAyMCBMOTAgNjUgUTgwIDkyIDUwIDk3IFEyMCA5MiAxMCA2NSBMMTAgMjAgUTIyIDUgNTAgNVoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPHJlY3QgeD0iMjAiIHk9IjIwIiB3aWR0aD0iNjAiIGhlaWdodD0iMzUiIGZpbGw9IiMwMDAiLz4KICA8dGV4dCB4PSI1MCIgeT0iNDQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjRkY2NjAwIj5WQ0Y8L3RleHQ+Cjwvc3ZnPg==",
+  "Villarreal": {bg:"#FFCD00",fg:"#009BDE",t:"VCF"},
+  "Vissel Kobe": {bg:"#990000",fg:"#FFFFFF",t:"VK"},
+  "Werder Bremen": {bg:"#1D9053",fg:"#FFFFFF",t:"SVW"},
+  "Wolfsburg": {bg:"#65B32E",fg:"#003063",t:"VFL"},
+  "Wolves": {bg:"#FDB913",fg:"#231F20",t:"WOL"},
+};
+
+const LEAGUE_BADGES = {
+  "Bundesliga": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIiBmaWxsPSIjRDMwMTBDIi8+CiAgPHRleHQgeD0iNTAiIHk9IjM4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+Qkw8L3RleHQ+CiAgPHJlY3QgeD0iMTUiIHk9IjQ4IiB3aWR0aD0iNzAiIGhlaWdodD0iMyIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iMC42Ii8+CiAgPHRleHQgeD0iNTAiIHk9IjY4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI4IiBmaWxsPSIjZmZmIj5CVU5ERVNMSUdBPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI4MiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNyIgZmlsbD0iI2NjYyI+R0VSTUFOWTwvdGV4dD4KPC9zdmc+",
+  "Copa do Mundo": {bg:"#C8A400",fg:"#FFFFFF",t:"WC"},
+  "La Liga": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIiBmaWxsPSIjRUU4QTAwIi8+CiAgPHRleHQgeD0iNTAiIHk9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNiIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+TEE8L3RleHQ+CiAgPHRleHQgeD0iNTAiIHk9IjYyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNiIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+TElHQTwvdGV4dD4KICA8cmVjdCB4PSIxNSIgeT0iNzAiIHdpZHRoPSI3MCIgaGVpZ2h0PSIzIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIwLjUiLz4KICA8dGV4dCB4PSI1MCIgeT0iODgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjgiIGZpbGw9IiNmZmYiPkVTUEHDkUE8L3RleHQ+Cjwvc3ZnPg==",
+  "Liga dos Campe\u00f5es": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIiBmaWxsPSIjMUIxNDY0Ii8+CiAgPHBvbHlnb24gcG9pbnRzPSI1MCw4IDU4LDMyIDg0LDMyIDY0LDQ4IDcyLDcyIDUwLDU3IDI4LDcyIDM2LDQ4IDE2LDMyIDQyLDMyIiBmaWxsPSIjQzhBNDAwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMSIvPgogIDx0ZXh0IHg9IjUwIiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+Q0hBTVBJT05TPC90ZXh0Pgo8L3N2Zz4=",
+  "Ligue 1": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIiBmaWxsPSIjMUIyQTZCIi8+CiAgPHRleHQgeD0iNTAiIHk9IjM4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+TDE8L3RleHQ+CiAgPHJlY3QgeD0iMTUiIHk9IjQ4IiB3aWR0aD0iNzAiIGhlaWdodD0iMyIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iMC42Ii8+CiAgPHRleHQgeD0iNTAiIHk9IjY4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI5IiBmaWxsPSIjZmZmIj5MSUdVRSAxPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI4MiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNyIgZmlsbD0iI2NjYyI+RlJBTkNFPC90ZXh0Pgo8L3N2Zz4=",
+  "Premier League": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIiBmaWxsPSIjM0QwMTUyIi8+CiAgPHRleHQgeD0iNTAiIHk9IjQyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+UEw8L3RleHQ+CiAgPHBhdGggZD0iTTIwIDU1IEw4MCA1NSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSI1MCIgeT0iNzIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjgiIGZpbGw9IiNmZmYiPlBSRU1JRVI8L3RleHQ+CiAgPHRleHQgeD0iNTAiIHk9IjgzIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI4IiBmaWxsPSIjZmZmIj5MRUFHVUU8L3RleHQ+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSIyMiIgcj0iOCIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iMC4zIi8+CiAgPHRleHQgeD0iNTAiIHk9IjI2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2siIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNmZmYiPvCfkZE8L3RleHQ+Cjwvc3ZnPg==",
+  "Primeira Liga": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIiBmaWxsPSIjMDA2NjAwIi8+CiAgPHRleHQgeD0iNTAiIHk9IjM1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+TElHQTwvdGV4dD4KICA8dGV4dCB4PSI1MCIgeT0iNTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSIjRkYwMDAwIj5QT1JUVUdBTDwvdGV4dD4KICA8cmVjdCB4PSIxNSIgeT0iNjIiIHdpZHRoPSI3MCIgaGVpZ2h0PSIzIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIwLjUiLz4KICA8dGV4dCB4PSI1MCIgeT0iODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjgiIGZpbGw9IiNmZmYiPvCfh7Xwn4e5PC90ZXh0Pgo8L3N2Zz4=",
+  "Serie A": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIiBmaWxsPSIjMUUzQTVGIi8+CiAgPHRleHQgeD0iNTAiIHk9IjM4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMiIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iI2ZmZiI+U0E8L3RleHQ+CiAgPHJlY3QgeD0iMTUiIHk9IjQ4IiB3aWR0aD0iNzAiIGhlaWdodD0iMyIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iMC42Ii8+CiAgPHRleHQgeD0iNTAiIHk9IjY4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI5IiBmaWxsPSIjZmZmIj5TRVJJRSBBPC90ZXh0PgogIDx0ZXh0IHg9IjUwIiB5PSI4MiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNyIgZmlsbD0iI2NjYyI+SVRBTElBPC90ZXh0Pgo8L3N2Zz4=",
+};
+
+// ─── COUNTRY FLAGS (emoji) ────────────────────────────────────────────────────
+const FLAGS = {
+  "Portugal":"🇵🇹","Brasil":"🇧🇷","Argentina":"🇦🇷","França":"🇫🇷","Espanha":"🇪🇸",
+  "Alemanha":"🇩🇪","Itália":"🇮🇹","Inglaterra":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Holanda":"🇳🇱","Polónia":"🇵🇱",
+  "Bélgica":"🇧🇪","Suécia":"🇸🇪","Noruega":"🇳🇴","Croácia":"🇭🇷","Uruguai":"🇺🇾",
+  "Argélia":"🇩🇿","Senegal":"🇸🇳","Egito":"🇪🇬","Camarões":"🇨🇲","Costa do Marfim":"🇨🇮",
+  "Libéria":"🇱🇷","Ucrânia":"🇺🇦",
+};
+
+// ─── PLAYERS ─────────────────────────────────────────────────────────────────
+// trofeus now uses arrays of {nome, vezes} for win-count support
+// ligas = leagues the player PLAYED IN (not won)
+const JOGADORES = [
+  // Portugal
+  { nome:"Cristiano Ronaldo", pais:"Portugal", posicao:"Avançado",
+    ligas:["Premier League","La Liga","Serie A","Saudi Pro League"],
+    clubes:["Manchester United","Real Madrid","Juventus","Sporting CP"],
+    trofeus:[{n:"Liga dos Campeões",v:5},{n:"Ballon d'Or",v:5},{n:"Euro",v:1},{n:"Premier League",v:3},{n:"La Liga",v:2}] },
+  { nome:"Luís Figo", pais:"Portugal", posicao:"Médio",
+    ligas:["La Liga","Serie A"], clubes:["Barcelona","Real Madrid","Inter Milão","Sporting CP"],
+    trofeus:[{n:"Ballon d'Or",v:1},{n:"La Liga",v:2},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Eusébio", pais:"Portugal", posicao:"Avançado",
+    ligas:["Primeira Liga"], clubes:["Benfica"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Bola de Ouro",v:1},{n:"Primeira Liga",v:11}] },
+  { nome:"Rui Costa", pais:"Portugal", posicao:"Médio",
+    ligas:["Serie A"], clubes:["Fiorentina","AC Milan","Benfica"],
+    trofeus:[{n:"Serie A",v:2},{n:"Liga dos Campeões",v:1}] },
+  { nome:"João Félix", pais:"Portugal", posicao:"Avançado",
+    ligas:["La Liga","Premier League"], clubes:["Atlético Madrid","Chelsea","Barcelona","Benfica"],
+    trofeus:[{n:"La Liga",v:1}] },
+  { nome:"Bernardo Silva", pais:"Portugal", posicao:"Médio",
+    ligas:["Premier League","Ligue 1"], clubes:["Manchester City","Monaco","Benfica"],
+    trofeus:[{n:"Premier League",v:5},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Pepe", pais:"Portugal", posicao:"Defesa",
+    ligas:["La Liga"], clubes:["Real Madrid","Porto"],
+    trofeus:[{n:"Liga dos Campeões",v:3},{n:"La Liga",v:2},{n:"Euro",v:1}] },
+  { nome:"Deco", pais:"Portugal", posicao:"Médio",
+    ligas:["La Liga","Premier League"], clubes:["Barcelona","Chelsea","Porto"],
+    trofeus:[{n:"Liga dos Campeões",v:2},{n:"La Liga",v:1}] },
+  { nome:"Nani", pais:"Portugal", posicao:"Avançado",
+    ligas:["Premier League"], clubes:["Manchester United","Sporting CP","Lazio"],
+    trofeus:[{n:"Premier League",v:4},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Ricardo Carvalho", pais:"Portugal", posicao:"Defesa",
+    ligas:["Premier League","La Liga"], clubes:["Porto","Chelsea","Real Madrid"],
+    trofeus:[{n:"Liga dos Campeões",v:2},{n:"Premier League",v:1},{n:"La Liga",v:2}] },
+  { nome:"Vítor Baía", pais:"Portugal", posicao:"Guarda-Redes",
+    ligas:["La Liga","Primeira Liga"], clubes:["Porto","Barcelona"],
+    trofeus:[{n:"Liga dos Campeões",v:2},{n:"Primeira Liga",v:6}] },
+  // Brasil
+  { nome:"Pelé", pais:"Brasil", posicao:"Avançado",
+    ligas:["Brasileirão"], clubes:["Santos"],
+    trofeus:[{n:"Copa do Mundo",v:3},{n:"Copa Libertadores",v:2}] },
+  { nome:"Ronaldo Nazário", pais:"Brasil", posicao:"Avançado",
+    ligas:["La Liga","Serie A"], clubes:["Barcelona","Real Madrid","Inter Milão","PSV"],
+    trofeus:[{n:"Copa do Mundo",v:2},{n:"Ballon d'Or",v:2},{n:"La Liga",v:1},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Ronaldinho", pais:"Brasil", posicao:"Médio",
+    ligas:["La Liga","Serie A","Ligue 1"], clubes:["Barcelona","AC Milan","PSG"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Ballon d'Or",v:2},{n:"La Liga",v:2},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Cafu", pais:"Brasil", posicao:"Defesa",
+    ligas:["Serie A"], clubes:["Roma","AC Milan","São Paulo"],
+    trofeus:[{n:"Copa do Mundo",v:2},{n:"Liga dos Campeões",v:1},{n:"Serie A",v:2}] },
+  { nome:"Rivaldo", pais:"Brasil", posicao:"Médio",
+    ligas:["La Liga","Serie A"], clubes:["Barcelona","AC Milan"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Ballon d'Or",v:1},{n:"La Liga",v:2},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Neymar", pais:"Brasil", posicao:"Avançado",
+    ligas:["La Liga","Ligue 1"], clubes:["Barcelona","PSG","Santos"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"La Liga",v:2},{n:"Ligue 1",v:6}] },
+  { nome:"Romário", pais:"Brasil", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Barcelona","PSV","Flamengo"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Bola de Ouro",v:1}] },
+  { nome:"Kaká", pais:"Brasil", posicao:"Médio",
+    ligas:["Serie A","La Liga"], clubes:["AC Milan","Real Madrid"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Ballon d'Or",v:1},{n:"Serie A",v:1},{n:"La Liga",v:1}] },
+  { nome:"Roberto Carlos", pais:"Brasil", posicao:"Defesa",
+    ligas:["La Liga","Serie A"], clubes:["Real Madrid","Inter Milão"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:3},{n:"La Liga",v:4}] },
+  { nome:"Dani Alves", pais:"Brasil", posicao:"Defesa",
+    ligas:["La Liga","Serie A","Ligue 1"], clubes:["Barcelona","Juventus","PSG"],
+    trofeus:[{n:"Liga dos Campeões",v:3},{n:"La Liga",v:6},{n:"Serie A",v:1}] },
+  { nome:"Thiago Silva", pais:"Brasil", posicao:"Defesa",
+    ligas:["Ligue 1","Premier League","Serie A"], clubes:["PSG","Chelsea","AC Milan"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Ligue 1",v:8},{n:"Serie A",v:1}] },
+  { nome:"Adriano", pais:"Brasil", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Inter Milão","Parma","Roma"],
+    trofeus:[{n:"Serie A",v:4},{n:"Copa América",v:1}] },
+  { nome:"Vinicius Jr", pais:"Brasil", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Real Madrid","Flamengo"],
+    trofeus:[{n:"Liga dos Campeões",v:2},{n:"La Liga",v:2},{n:"Ballon d'Or",v:1}] },
+  // Argentina
+  { nome:"Lionel Messi", pais:"Argentina", posicao:"Avançado",
+    ligas:["La Liga","Ligue 1"], clubes:["Barcelona","PSG","Inter Miami"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Ballon d'Or",v:8},{n:"Liga dos Campeões",v:4},{n:"La Liga",v:10}] },
+  { nome:"Diego Maradona", pais:"Argentina", posicao:"Avançado",
+    ligas:["La Liga","Serie A"], clubes:["Napoli","Barcelona","Boca Juniors"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Serie A",v:2},{n:"La Liga",v:1}] },
+  { nome:"Gabriel Batistuta", pais:"Argentina", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Fiorentina","Roma","Inter Milão"],
+    trofeus:[{n:"Copa América",v:1}] },
+  { nome:"Javier Zanetti", pais:"Argentina", posicao:"Defesa",
+    ligas:["Serie A"], clubes:["Inter Milão"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Serie A",v:5}] },
+  { nome:"Sergio Agüero", pais:"Argentina", posicao:"Avançado",
+    ligas:["Premier League","La Liga"], clubes:["Manchester City","Barcelona","Atlético Madrid"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Premier League",v:5}] },
+  { nome:"Ángel Di María", pais:"Argentina", posicao:"Médio",
+    ligas:["La Liga","Premier League","Ligue 1"], clubes:["Real Madrid","Manchester United","PSG","Benfica"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:1},{n:"La Liga",v:1},{n:"Ligue 1",v:4}] },
+  { nome:"Carlos Tevez", pais:"Argentina", posicao:"Avançado",
+    ligas:["Premier League","Serie A"], clubes:["Manchester United","Manchester City","Juventus","Boca Juniors"],
+    trofeus:[{n:"Premier League",v:2},{n:"Liga dos Campeões",v:1},{n:"Serie A",v:2}] },
+  { nome:"Gonzalo Higuain", pais:"Argentina", posicao:"Avançado",
+    ligas:["La Liga","Serie A"], clubes:["Real Madrid","Juventus","Napoli"],
+    trofeus:[{n:"La Liga",v:2},{n:"Serie A",v:3}] },
+  { nome:"Juan Roman Riquelme", pais:"Argentina", posicao:"Médio",
+    ligas:["La Liga"], clubes:["Boca Juniors","Barcelona","Villarreal"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Copa América",v:1}] },
+  { nome:"Paulo Dybala", pais:"Argentina", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Juventus","Roma"],
+    trofeus:[{n:"Serie A",v:5}] },
+  // França
+  { nome:"Zinedine Zidane", pais:"França", posicao:"Médio",
+    ligas:["La Liga","Serie A"], clubes:["Real Madrid","Juventus"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:1},{n:"Ballon d'Or",v:1},{n:"Euro",v:1},{n:"La Liga",v:1},{n:"Serie A",v:1}] },
+  { nome:"Thierry Henry", pais:"França", posicao:"Avançado",
+    ligas:["Premier League","La Liga"], clubes:["Arsenal","Barcelona","Monaco"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"La Liga",v:1},{n:"Euro",v:1}] },
+  { nome:"Kylian Mbappé", pais:"França", posicao:"Avançado",
+    ligas:["Ligue 1","La Liga"], clubes:["PSG","Monaco","Real Madrid"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Ligue 1",v:6},{n:"La Liga",v:1}] },
+  { nome:"Michel Platini", pais:"França", posicao:"Médio",
+    ligas:["Serie A"], clubes:["Juventus","Saint-Étienne"],
+    trofeus:[{n:"Euro",v:1},{n:"Bola de Ouro",v:3},{n:"Liga dos Campeões",v:1},{n:"Serie A",v:3}] },
+  { nome:"Karim Benzema", pais:"França", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Real Madrid","Lyon"],
+    trofeus:[{n:"Liga dos Campeões",v:5},{n:"Ballon d'Or",v:1},{n:"La Liga",v:6}] },
+  { nome:"Patrick Vieira", pais:"França", posicao:"Médio",
+    ligas:["Premier League","Serie A"], clubes:["Arsenal","Juventus","Inter Milão"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Premier League",v:3},{n:"Euro",v:1}] },
+  { nome:"Antoine Griezmann", pais:"França", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Atlético Madrid","Barcelona"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"La Liga",v:1}] },
+  { nome:"N'Golo Kanté", pais:"França", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Chelsea","Leicester"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Premier League",v:2},{n:"Liga dos Campeões",v:1}] },
+  // Espanha
+  { nome:"Xavi Hernández", pais:"Espanha", posicao:"Médio",
+    ligas:["La Liga"], clubes:["Barcelona"],
+    trofeus:[{n:"Liga dos Campeões",v:4},{n:"Copa do Mundo",v:1},{n:"Euro",v:2},{n:"La Liga",v:8}] },
+  { nome:"Andrés Iniesta", pais:"Espanha", posicao:"Médio",
+    ligas:["La Liga"], clubes:["Barcelona"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:4},{n:"Euro",v:2},{n:"La Liga",v:9}] },
+  { nome:"Iker Casillas", pais:"Espanha", posicao:"Guarda-Redes",
+    ligas:["La Liga","Primeira Liga"], clubes:["Real Madrid","Porto"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:3},{n:"Euro",v:2},{n:"La Liga",v:5}] },
+  { nome:"Fernando Torres", pais:"Espanha", posicao:"Avançado",
+    ligas:["La Liga","Premier League"], clubes:["Atlético Madrid","Liverpool","Chelsea"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Euro",v:2},{n:"Liga dos Campeões",v:1},{n:"Premier League",v:1}] },
+  { nome:"Raúl", pais:"Espanha", posicao:"Avançado",
+    ligas:["La Liga","Bundesliga"], clubes:["Real Madrid","Schalke"],
+    trofeus:[{n:"Liga dos Campeões",v:3},{n:"La Liga",v:6}] },
+  { nome:"Sergio Ramos", pais:"Espanha", posicao:"Defesa",
+    ligas:["La Liga"], clubes:["Real Madrid","Sevilla","PSG"],
+    trofeus:[{n:"Liga dos Campeões",v:4},{n:"Copa do Mundo",v:1},{n:"Euro",v:2},{n:"La Liga",v:5}] },
+  { nome:"Cesc Fàbregas", pais:"Espanha", posicao:"Médio",
+    ligas:["Premier League","La Liga","Ligue 1"], clubes:["Arsenal","Barcelona","Chelsea","Monaco"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Euro",v:2},{n:"La Liga",v:1}] },
+  { nome:"David Silva", pais:"Espanha", posicao:"Médio",
+    ligas:["Premier League","La Liga"], clubes:["Manchester City","Valencia"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Euro",v:2},{n:"Premier League",v:4},{n:"Liga dos Campeões",v:1}] },
+  // Alemanha
+  { nome:"Franz Beckenbauer", pais:"Alemanha", posicao:"Defesa",
+    ligas:["Bundesliga"], clubes:["Bayern Munich"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Bola de Ouro",v:2},{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:5}] },
+  { nome:"Gerd Müller", pais:"Alemanha", posicao:"Avançado",
+    ligas:["Bundesliga"], clubes:["Bayern Munich"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Bola de Ouro",v:1},{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:4}] },
+  { nome:"Oliver Kahn", pais:"Alemanha", posicao:"Guarda-Redes",
+    ligas:["Bundesliga"], clubes:["Bayern Munich"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:8}] },
+  { nome:"Lothar Matthäus", pais:"Alemanha", posicao:"Médio",
+    ligas:["Bundesliga","Serie A"], clubes:["Bayern Munich","Inter Milão"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Bola de Ouro",v:1},{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:7}] },
+  { nome:"Miroslav Klose", pais:"Alemanha", posicao:"Avançado",
+    ligas:["Bundesliga","Serie A"], clubes:["Bayern Munich","Lazio"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:1}] },
+  { nome:"Michael Ballack", pais:"Alemanha", posicao:"Médio",
+    ligas:["Bundesliga","Premier League"], clubes:["Bayern Munich","Chelsea","Bayer Leverkusen"],
+    trofeus:[{n:"Bundesliga",v:3},{n:"Premier League",v:1}] },
+  { nome:"Toni Kroos", pais:"Alemanha", posicao:"Médio",
+    ligas:["Bundesliga","La Liga"], clubes:["Real Madrid","Bayern Munich"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:5},{n:"Bundesliga",v:3},{n:"La Liga",v:3}] },
+  { nome:"Manuel Neuer", pais:"Alemanha", posicao:"Guarda-Redes",
+    ligas:["Bundesliga"], clubes:["Bayern Munich"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:2},{n:"Bundesliga",v:9}] },
+  { nome:"Thomas Müller", pais:"Alemanha", posicao:"Avançado",
+    ligas:["Bundesliga"], clubes:["Bayern Munich"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:2},{n:"Bundesliga",v:12}] },
+  { nome:"Robert Lewandowski", pais:"Polónia", posicao:"Avançado",
+    ligas:["Bundesliga","La Liga"], clubes:["Bayern Munich","Barcelona","Dortmund"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:8},{n:"La Liga",v:1}] },
+  // Itália
+  { nome:"Paolo Maldini", pais:"Itália", posicao:"Defesa",
+    ligas:["Serie A"], clubes:["AC Milan"],
+    trofeus:[{n:"Liga dos Campeões",v:5},{n:"Serie A",v:7}] },
+  { nome:"Roberto Baggio", pais:"Itália", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Juventus","Fiorentina","AC Milan"],
+    trofeus:[{n:"Bola de Ouro",v:1},{n:"Serie A",v:1}] },
+  { nome:"Alessandro Del Piero", pais:"Itália", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Juventus"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:1},{n:"Serie A",v:6}] },
+  { nome:"Francesco Totti", pais:"Itália", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Roma"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Serie A",v:1}] },
+  { nome:"Gianluigi Buffon", pais:"Itália", posicao:"Guarda-Redes",
+    ligas:["Serie A","Ligue 1"], clubes:["Juventus","PSG"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Serie A",v:10}] },
+  { nome:"Fabio Cannavaro", pais:"Itália", posicao:"Defesa",
+    ligas:["La Liga","Serie A"], clubes:["Juventus","Real Madrid","Napoli"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Ballon d'Or",v:1},{n:"La Liga",v:2},{n:"Serie A",v:1}] },
+  { nome:"Andrea Pirlo", pais:"Itália", posicao:"Médio",
+    ligas:["Serie A"], clubes:["Juventus","AC Milan","Inter Milão"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:1},{n:"Serie A",v:7}] },
+  // Inglaterra
+  { nome:"David Beckham", pais:"Inglaterra", posicao:"Médio",
+    ligas:["Premier League","La Liga","Serie A","Ligue 1"], clubes:["Manchester United","Real Madrid","AC Milan","PSG","LA Galaxy"],
+    trofeus:[{n:"Premier League",v:6},{n:"Liga dos Campeões",v:1},{n:"La Liga",v:1}] },
+  { nome:"Wayne Rooney", pais:"Inglaterra", posicao:"Avançado",
+    ligas:["Premier League"], clubes:["Manchester United","Everton"],
+    trofeus:[{n:"Premier League",v:5},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Steven Gerrard", pais:"Inglaterra", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Liverpool"],
+    trofeus:[{n:"Liga dos Campeões",v:1}] },
+  { nome:"Frank Lampard", pais:"Inglaterra", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Chelsea","Manchester City"],
+    trofeus:[{n:"Premier League",v:3},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Harry Kane", pais:"Inglaterra", posicao:"Avançado",
+    ligas:["Premier League","Bundesliga"], clubes:["Tottenham","Bayern Munich"],
+    trofeus:[{n:"Bundesliga",v:1}] },
+  { nome:"Gary Lineker", pais:"Inglaterra", posicao:"Avançado",
+    ligas:["Premier League","La Liga"], clubes:["Barcelona","Tottenham","Everton"],
+    trofeus:[{n:"La Liga",v:1}] },
+  { nome:"Paul Scholes", pais:"Inglaterra", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Manchester United"],
+    trofeus:[{n:"Premier League",v:11},{n:"Liga dos Campeões",v:2}] },
+  // Holanda
+  { nome:"Johan Cruyff", pais:"Holanda", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Ajax","Barcelona"],
+    trofeus:[{n:"Bola de Ouro",v:3},{n:"Liga dos Campeões",v:3},{n:"La Liga",v:1}] },
+  { nome:"Marco van Basten", pais:"Holanda", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["AC Milan","Ajax"],
+    trofeus:[{n:"Euro",v:1},{n:"Bola de Ouro",v:3},{n:"Liga dos Campeões",v:2},{n:"Serie A",v:3}] },
+  { nome:"Ruud van Nistelrooy", pais:"Holanda", posicao:"Avançado",
+    ligas:["Premier League","La Liga"], clubes:["Manchester United","Real Madrid","PSV"],
+    trofeus:[{n:"Premier League",v:1},{n:"La Liga",v:1},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Virgil van Dijk", pais:"Holanda", posicao:"Defesa",
+    ligas:["Premier League"], clubes:["Liverpool","Southampton","Celtic"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Premier League",v:1}] },
+  { nome:"Ruud Gullit", pais:"Holanda", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["AC Milan","PSV","Fiorentina","Chelsea"],
+    trofeus:[{n:"Euro",v:1},{n:"Bola de Ouro",v:1},{n:"Liga dos Campeões",v:2},{n:"Serie A",v:3}] },
+  { nome:"Arjen Robben", pais:"Holanda", posicao:"Avançado",
+    ligas:["Bundesliga","Premier League","La Liga"], clubes:["Bayern Munich","Chelsea","Real Madrid","PSV"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:8},{n:"Premier League",v:1}] },
+  { nome:"Wesley Sneijder", pais:"Holanda", posicao:"Médio",
+    ligas:["La Liga","Serie A"], clubes:["Inter Milão","Real Madrid","Ajax"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"La Liga",v:1},{n:"Serie A",v:1}] },
+  { nome:"Dennis Bergkamp", pais:"Holanda", posicao:"Avançado",
+    ligas:["Premier League","Serie A"], clubes:["Arsenal","Inter Milão","Ajax"],
+    trofeus:[] },
+  // Outros
+  { nome:"George Weah", pais:"Libéria", posicao:"Avançado",
+    ligas:["Serie A","Ligue 1","Premier League"], clubes:["AC Milan","PSG","Chelsea"],
+    trofeus:[{n:"Bola de Ouro",v:1},{n:"Serie A",v:2},{n:"Ligue 1",v:2}] },
+  { nome:"Didier Drogba", pais:"Costa do Marfim", posicao:"Avançado",
+    ligas:["Premier League"], clubes:["Chelsea","Galatasaray"],
+    trofeus:[{n:"Premier League",v:4},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Samuel Eto'o", pais:"Camarões", posicao:"Avançado",
+    ligas:["La Liga","Serie A"], clubes:["Barcelona","Inter Milão","Chelsea"],
+    trofeus:[{n:"Liga dos Campeões",v:3},{n:"La Liga",v:3},{n:"Serie A",v:1}] },
+  { nome:"Luka Modrić", pais:"Croácia", posicao:"Médio",
+    ligas:["La Liga","Premier League"], clubes:["Real Madrid","Tottenham"],
+    trofeus:[{n:"Liga dos Campeões",v:5},{n:"Ballon d'Or",v:1},{n:"La Liga",v:3}] },
+  { nome:"Mohamed Salah", pais:"Egito", posicao:"Avançado",
+    ligas:["Premier League","Serie A"], clubes:["Liverpool","Roma","Chelsea"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Premier League",v:1}] },
+  { nome:"Erling Haaland", pais:"Noruega", posicao:"Avançado",
+    ligas:["Premier League","Bundesliga"], clubes:["Manchester City","Dortmund"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Premier League",v:2},{n:"Bundesliga",v:1}] },
+  { nome:"Kevin De Bruyne", pais:"Bélgica", posicao:"Médio",
+    ligas:["Premier League","Bundesliga"], clubes:["Manchester City","Chelsea","Wolfsburg"],
+    trofeus:[{n:"Premier League",v:5},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Zlatan Ibrahimović", pais:"Suécia", posicao:"Avançado",
+    ligas:["Serie A","La Liga","Ligue 1","Premier League"], clubes:["PSG","AC Milan","Barcelona","Manchester United","Inter Milão","Ajax"],
+    trofeus:[{n:"Ligue 1",v:4},{n:"Serie A",v:4},{n:"La Liga",v:1},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Luis Suárez", pais:"Uruguai", posicao:"Avançado",
+    ligas:["La Liga","Premier League"], clubes:["Barcelona","Atlético Madrid","Liverpool","Ajax"],
+    trofeus:[{n:"La Liga",v:4},{n:"Liga dos Campeões",v:1},{n:"Premier League",v:1}] },
+  { nome:"Andriy Shevchenko", pais:"Ucrânia", posicao:"Avançado",
+    ligas:["Serie A","Premier League"], clubes:["AC Milan","Chelsea"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Ballon d'Or",v:1},{n:"Serie A",v:2}] },
+  { nome:"Sadio Mané", pais:"Senegal", posicao:"Avançado",
+    ligas:["Premier League","Bundesliga"], clubes:["Liverpool","Bayern Munich"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Premier League",v:1},{n:"Bundesliga",v:1}] },
+  { nome:"Riyad Mahrez", pais:"Argélia", posicao:"Avançado",
+    ligas:["Premier League"], clubes:["Manchester City","Leicester"],
+    trofeus:[{n:"Premier League",v:4},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Davor Šuker", pais:"Croácia", posicao:"Avançado",
+    ligas:["La Liga","Premier League"], clubes:["Real Madrid","Arsenal","Sevilla"],
+    trofeus:[{n:"La Liga",v:1}] },
+  { nome:"Clarence Seedorf", pais:"Holanda", posicao:"Médio",
+    ligas:["Serie A","La Liga"], clubes:["AC Milan","Real Madrid","Inter Milão","Ajax"],
+    trofeus:[{n:"Liga dos Campeões",v:4},{n:"Serie A",v:3},{n:"La Liga",v:1}] },
+
+  // ── MAIS JOGADORES — variedade de eras e países ─────────────────────────
+  // Escandinávia / Norte Europa
+  { nome:"Peter Schmeichel", pais:"Dinamarca", posicao:"Guarda-Redes",
+    ligas:["Premier League"], clubes:["Manchester United","Sporting CP","Aston Villa"],
+    trofeus:[{n:"Premier League",v:5},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Michael Laudrup", pais:"Dinamarca", posicao:"Médio",
+    ligas:["La Liga","Serie A"], clubes:["Barcelona","Real Madrid","Juventus","Ajax"],
+    trofeus:[{n:"La Liga",v:5},{n:"Liga dos Campeões",v:1},{n:"Serie A",v:1}] },
+  { nome:"Ronnie Whelan", pais:"Irlanda", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Liverpool"],
+    trofeus:[{n:"Premier League",v:6},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Henrik Larsson", pais:"Suécia", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Celtic","Barcelona","Manchester United"],
+    trofeus:[{n:"La Liga",v:1},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Sami Hyypiä", pais:"Finlândia", posicao:"Defesa",
+    ligas:["Premier League"], clubes:["Liverpool","Bayer Leverkusen"],
+    trofeus:[{n:"Liga dos Campeões",v:1}] },
+  // Europa Leste / Balcãs
+  { nome:"Robert Prosinečki", pais:"Croácia", posicao:"Médio",
+    ligas:["La Liga","Serie A"], clubes:["Real Madrid","Barcelona","Sevilla"],
+    trofeus:[{n:"La Liga",v:1}] },
+  { nome:"Zvonimir Boban", pais:"Croácia", posicao:"Médio",
+    ligas:["Serie A"], clubes:["AC Milan","Chelsea"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Serie A",v:4}] },
+  { nome:"Slaven Bilić", pais:"Croácia", posicao:"Defesa",
+    ligas:["Premier League","Bundesliga"], clubes:["Everton","Bayern Munich","West Ham"],
+    trofeus:[] },
+  { nome:"Predrag Mijatović", pais:"Montenegro", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Real Madrid","Valencia","Partizan"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"La Liga",v:1}] },
+  { nome:"Dejan Savićević", pais:"Montenegro", posicao:"Médio",
+    ligas:["Serie A"], clubes:["AC Milan","Red Star Belgrade"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Serie A",v:2}] },
+  { nome:"Dragan Džajić", pais:"Sérvia", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Fiorentina","Bastia"],
+    trofeus:[] },
+  { nome:"Siniša Mihajlović", pais:"Sérvia", posicao:"Defesa",
+    ligas:["Serie A"], clubes:["Lazio","Inter Milão","Roma"],
+    trofeus:[{n:"Serie A",v:1},{n:"Liga dos Campeões",v:1}] },
+  // Bélgica / Suíça / Áustria
+  { nome:"Marouane Fellaini", pais:"Bélgica", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Manchester United","Everton"],
+    trofeus:[{n:"Premier League",v:1}] },
+  { nome:"Jan Vertonghen", pais:"Bélgica", posicao:"Defesa",
+    ligas:["Premier League"], clubes:["Tottenham","Ajax","Benfica","Anderlecht"],
+    trofeus:[{n:"Liga dos Campeões",v:1}] },
+  { nome:"Vincent Kompany", pais:"Bélgica", posicao:"Defesa",
+    ligas:["Premier League","Bundesliga"], clubes:["Manchester City","Hamburgo","Anderlecht"],
+    trofeus:[{n:"Premier League",v:4},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Eden Hazard", pais:"Bélgica", posicao:"Avançado",
+    ligas:["La Liga","Premier League"], clubes:["Real Madrid","Chelsea","Lille"],
+    trofeus:[{n:"Premier League",v:2},{n:"La Liga",v:1}] },
+  { nome:"Axel Witsel", pais:"Bélgica", posicao:"Médio",
+    ligas:["Serie A","Bundesliga"], clubes:["Juventus","Dortmund","Benfica","Zenit"],
+    trofeus:[{n:"Serie A",v:1},{n:"Bundesliga",v:1}] },
+  // México / América do Norte
+  { nome:"Hugo Sánchez", pais:"México", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Real Madrid","Atlético Madrid"],
+    trofeus:[{n:"La Liga",v:5}] },
+  { nome:"Rafael Márquez", pais:"México", posicao:"Defesa",
+    ligas:["La Liga"], clubes:["Barcelona","Monaco","New York Red Bulls"],
+    trofeus:[{n:"La Liga",v:4},{n:"Liga dos Campeões",v:2}] },
+  { nome:"Javier Hernández", pais:"México", posicao:"Avançado",
+    ligas:["Premier League","La Liga","Bundesliga"], clubes:["Manchester United","Real Madrid","Bayer Leverkusen"],
+    trofeus:[{n:"Premier League",v:2}] },
+  // África
+  { nome:"Jay-Jay Okocha", pais:"Nigéria", posicao:"Médio",
+    ligas:["Bundesliga","Ligue 1","Premier League"], clubes:["Eintracht Frankfurt","PSG","Bolton","Fenerbahçe"],
+    trofeus:[] },
+  { nome:"Nwankwo Kanu", pais:"Nigéria", posicao:"Avançado",
+    ligas:["Premier League","Serie A"], clubes:["Arsenal","Ajax","Inter Milão","Portsmouth"],
+    trofeus:[{n:"Premier League",v:2},{n:"Liga dos Campeões",v:1}] },
+  { nome:"El Hadji Diouf", pais:"Senegal", posicao:"Avançado",
+    ligas:["Premier League"], clubes:["Liverpool","Bolton","Blackburn"],
+    trofeus:[] },
+  { nome:"Abedi Pelé", pais:"Gana", posicao:"Médio",
+    ligas:["Ligue 1","Serie A","Bundesliga"], clubes:["Marseille","Lyon","Torino"],
+    trofeus:[{n:"Liga dos Campeões",v:1}] },
+  { nome:"Emmanuel Adebayor", pais:"Togo", posicao:"Avançado",
+    ligas:["Premier League","La Liga"], clubes:["Arsenal","Manchester City","Tottenham","Real Madrid"],
+    trofeus:[{n:"La Liga",v:1}] },
+  { nome:"Yaya Touré", pais:"Costa do Marfim", posicao:"Médio",
+    ligas:["Premier League","La Liga"], clubes:["Manchester City","Barcelona","Monaco"],
+    trofeus:[{n:"Premier League",v:3},{n:"La Liga",v:2},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Wilfried Zaha", pais:"Costa do Marfim", posicao:"Avançado",
+    ligas:["Premier League"], clubes:["Crystal Palace","Manchester United"],
+    trofeus:[] },
+  { nome:"Hakim Ziyech", pais:"Marrocos", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Chelsea","Ajax"],
+    trofeus:[{n:"Liga dos Campeões",v:1}] },
+  { nome:"Achraf Hakimi", pais:"Marrocos", posicao:"Defesa",
+    ligas:["La Liga","Bundesliga","Serie A","Ligue 1"], clubes:["Real Madrid","Dortmund","Inter Milão","PSG"],
+    trofeus:[{n:"Bundesliga",v:1},{n:"Serie A",v:1}] },
+  // Médio Oriente / Ásia
+  { nome:"Ali Daei", pais:"Irão", posicao:"Avançado",
+    ligas:["Bundesliga"], clubes:["Bayern Munich","Hertha Berlin"],
+    trofeus:[{n:"Bundesliga",v:1}] },
+  { nome:"Hidetoshi Nakata", pais:"Japão", posicao:"Médio",
+    ligas:["Serie A"], clubes:["Roma","Parma","Bologna","Perugia"],
+    trofeus:[{n:"Serie A",v:1}] },
+  { nome:"Shinji Kagawa", pais:"Japão", posicao:"Médio",
+    ligas:["Premier League","Bundesliga"], clubes:["Manchester United","Dortmund"],
+    trofeus:[{n:"Bundesliga",v:2},{n:"Premier League",v:1}] },
+  { nome:"Son Heung-min", pais:"Coreia do Sul", posicao:"Avançado",
+    ligas:["Premier League","Bundesliga"], clubes:["Tottenham","Bayer Leverkusen","Hamburgo"],
+    trofeus:[{n:"Liga dos Campeões",v:1}] },
+  { nome:"Park Ji-sung", pais:"Coreia do Sul", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Manchester United","PSV","Queens Park Rangers"],
+    trofeus:[{n:"Premier League",v:4},{n:"Liga dos Campeões",v:1}] },
+  // América do Sul extras
+  { nome:"Diego Forlán", pais:"Uruguai", posicao:"Avançado",
+    ligas:["La Liga","Serie A","Premier League"], clubes:["Atlético Madrid","Manchester United","Inter Milão","Villarreal"],
+    trofeus:[{n:"La Liga",v:1}] },
+  { nome:"Edinson Cavani", pais:"Uruguai", posicao:"Avançado",
+    ligas:["Serie A","Ligue 1","Premier League"], clubes:["PSG","Napoli","Manchester United"],
+    trofeus:[{n:"Ligue 1",v:6},{n:"Serie A",v:1}] },
+  { nome:"Álvaro Recoba", pais:"Uruguai", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Inter Milão","Venezia"],
+    trofeus:[{n:"Serie A",v:2}] },
+  { nome:"Jorge Valdano", pais:"Argentina", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Real Madrid","Alavés"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"La Liga",v:2}] },
+  { nome:"Claudio Caniggia", pais:"Argentina", posicao:"Avançado",
+    ligas:["Serie A","La Liga"], clubes:["Roma","Lazio","Atalanta","Boca Juniors"],
+    trofeus:[{n:"Serie A",v:1}] },
+  { nome:"Marcelo Salas", pais:"Chile", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Lazio","Juventus","River Plate"],
+    trofeus:[{n:"Serie A",v:1}] },
+  { nome:"Ivan Zamorano", pais:"Chile", posicao:"Avançado",
+    ligas:["La Liga","Serie A"], clubes:["Real Madrid","Inter Milão","Sevilla"],
+    trofeus:[{n:"La Liga",v:2},{n:"Liga dos Campeões",v:1},{n:"Serie A",v:1}] },
+  { nome:"Marcelo", pais:"Brasil", posicao:"Defesa",
+    ligas:["La Liga"], clubes:["Real Madrid","Fluminense"],
+    trofeus:[{n:"La Liga",v:5},{n:"Liga dos Campeões",v:4}] },
+  { nome:"Alisson Becker", pais:"Brasil", posicao:"Guarda-Redes",
+    ligas:["Premier League","Serie A"], clubes:["Liverpool","Roma"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Premier League",v:1}] },
+  { nome:"Éderson", pais:"Brasil", posicao:"Guarda-Redes",
+    ligas:["Premier League"], clubes:["Manchester City","Benfica"],
+    trofeus:[{n:"Premier League",v:5},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Fred", pais:"Brasil", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Manchester United","Manchester City"],
+    trofeus:[{n:"Premier League",v:1}] },
+  { nome:"Gilberto Silva", pais:"Brasil", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Arsenal","Benfica","Hertha Berlin"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Premier League",v:1}] },
+  // Portugal extras  
+  { nome:"Hélder Postiga", pais:"Portugal", posicao:"Avançado",
+    ligas:["La Liga","Serie A","Primeira Liga"], clubes:["Sporting CP","Porto","Valencia","Lazio"],
+    trofeus:[{n:"La Liga",v:1}] },
+  { nome:"Nuno Gomes", pais:"Portugal", posicao:"Avançado",
+    ligas:["La Liga","Serie A","Primeira Liga"], clubes:["Fiorentina","Benfica","Sporting CP"],
+    trofeus:[] },
+  { nome:"Maniche", pais:"Portugal", posicao:"Médio",
+    ligas:["La Liga","Primeira Liga"], clubes:["Porto","Atlético Madrid","Dynamo Moscow","Chelsea"],
+    trofeus:[{n:"Liga dos Campeões",v:1}] },
+  { nome:"João Moutinho", pais:"Portugal", posicao:"Médio",
+    ligas:["Ligue 1","Premier League","Primeira Liga"], clubes:["Monaco","Wolves","Porto","Sporting CP"],
+    trofeus:[{n:"Euro",v:1}] },
+  { nome:"André Gomes", pais:"Portugal", posicao:"Médio",
+    ligas:["La Liga","Premier League"], clubes:["Barcelona","Everton","Valencia"],
+    trofeus:[{n:"Euro",v:1}] },
+  // Itália extras
+  { nome:"Franco Baresi", pais:"Itália", posicao:"Defesa",
+    ligas:["Serie A"], clubes:["AC Milan"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:3},{n:"Serie A",v:6}] },
+  { nome:"Roberto Donadoni", pais:"Itália", posicao:"Médio",
+    ligas:["Serie A"], clubes:["AC Milan","New York Red Bulls"],
+    trofeus:[{n:"Liga dos Campeões",v:3},{n:"Serie A",v:5}] },
+  { nome:"Dino Zoff", pais:"Itália", posicao:"Guarda-Redes",
+    ligas:["Serie A"], clubes:["Juventus","Napoli"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Serie A",v:6}] },
+  { nome:"Roberto Mancini", pais:"Itália", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Lazio","Sampdoria"],
+    trofeus:[{n:"Serie A",v:2}] },
+  { nome:"Luca Vialli", pais:"Itália", posicao:"Avançado",
+    ligas:["Serie A","Premier League"], clubes:["Juventus","Sampdoria","Chelsea"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Serie A",v:3},{n:"Premier League",v:1}] },
+  { nome:"Christian Vieri", pais:"Itália", posicao:"Avançado",
+    ligas:["La Liga","Serie A"], clubes:["Inter Milão","Lazio","Atlético Madrid","Juventus"],
+    trofeus:[{n:"La Liga",v:1},{n:"Serie A",v:1}] },
+  { nome:"Ciro Immobile", pais:"Itália", posicao:"Avançado",
+    ligas:["Serie A","Bundesliga"], clubes:["Lazio","Dortmund","Torino"],
+    trofeus:[{n:"Serie A",v:1}] },
+  { nome:"Lorenzo Insigne", pais:"Itália", posicao:"Avançado",
+    ligas:["Serie A"], clubes:["Napoli","Toronto FC"],
+    trofeus:[{n:"Euro",v:1}] },
+  { nome:"Marco Tardelli", pais:"Itália", posicao:"Médio",
+    ligas:["Serie A"], clubes:["Juventus","Inter Milão","Como"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:1},{n:"Serie A",v:4}] },
+  // Espanha extras
+  { nome:"Fernando Hierro", pais:"Espanha", posicao:"Defesa",
+    ligas:["La Liga"], clubes:["Real Madrid","Bolton","Sporting CP"],
+    trofeus:[{n:"La Liga",v:5},{n:"Liga dos Campeões",v:3}] },
+  { nome:"Emilio Butragueño", pais:"Espanha", posicao:"Avançado",
+    ligas:["La Liga"], clubes:["Real Madrid","Atlético Madrid"],
+    trofeus:[{n:"La Liga",v:6}] },
+  { nome:"Michel Salgado", pais:"Espanha", posicao:"Defesa",
+    ligas:["La Liga","Premier League"], clubes:["Real Madrid","Blackburn","Celta Vigo"],
+    trofeus:[{n:"La Liga",v:2},{n:"Liga dos Campeões",v:2}] },
+  { nome:"Gaizka Mendieta", pais:"Espanha", posicao:"Médio",
+    ligas:["La Liga","Serie A"], clubes:["Valencia","Lazio","Barcelona"],
+    trofeus:[{n:"La Liga",v:1}] },
+  { nome:"Josep Guardiola", pais:"Espanha", posicao:"Médio",
+    ligas:["La Liga","Serie A"], clubes:["Barcelona","Brescia","Roma","Al-Ahly"],
+    trofeus:[{n:"La Liga",v:6},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Luis Enrique", pais:"Espanha", posicao:"Médio",
+    ligas:["La Liga"], clubes:["Barcelona","Real Madrid"],
+    trofeus:[{n:"La Liga",v:2},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Álvaro Morata", pais:"Espanha", posicao:"Avançado",
+    ligas:["La Liga","Premier League","Serie A"], clubes:["Real Madrid","Atlético Madrid","Chelsea","Juventus"],
+    trofeus:[{n:"La Liga",v:2},{n:"Liga dos Campeões",v:2},{n:"Serie A",v:2},{n:"Euro",v:1}] },
+  // França extras
+  { nome:"Marcel Desailly", pais:"França", posicao:"Defesa",
+    ligas:["Premier League","Serie A","Ligue 1"], clubes:["Chelsea","AC Milan","Marseille"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:2},{n:"Serie A",v:2},{n:"Euro",v:1}] },
+  { nome:"Laurent Blanc", pais:"França", posicao:"Defesa",
+    ligas:["La Liga","Serie A","Premier League","Ligue 1"], clubes:["Barcelona","Inter Milão","Manchester United","Bordeaux"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Euro",v:1},{n:"Premier League",v:1}] },
+  { nome:"Bixente Lizarazu", pais:"França", posicao:"Defesa",
+    ligas:["Bundesliga","La Liga","Ligue 1"], clubes:["Bayern Munich","Athletic Bilbao","Bordeaux"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Euro",v:1},{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:6}] },
+  { nome:"Sylvain Wiltord", pais:"França", posicao:"Avançado",
+    ligas:["Premier League","Ligue 1"], clubes:["Arsenal","Bordeaux","Lyon"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Euro",v:1},{n:"Premier League",v:2}] },
+  { nome:"Youri Djorkaeff", pais:"França", posicao:"Médio",
+    ligas:["Serie A","Bundesliga","Ligue 1"], clubes:["Inter Milão","Kaiserslautern","PSG","Monaco"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Euro",v:1},{n:"Serie A",v:1}] },
+  // Alemanha extras
+  { nome:"Jürgen Klinsmann", pais:"Alemanha", posicao:"Avançado",
+    ligas:["Bundesliga","La Liga","Premier League","Serie A"], clubes:["Bayern Munich","Monaco","Tottenham","Inter Milão"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Bundesliga",v:1},{n:"La Liga",v:1}] },
+  { nome:"Andreas Möller", pais:"Alemanha", posicao:"Médio",
+    ligas:["Bundesliga","Serie A"], clubes:["Dortmund","Juventus"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:2},{n:"Bundesliga",v:3},{n:"Serie A",v:1}] },
+  { nome:"Stefan Effenberg", pais:"Alemanha", posicao:"Médio",
+    ligas:["Bundesliga","Serie A","Premier League"], clubes:["Bayern Munich","Fiorentina","Manchester City"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:3}] },
+  { nome:"Rudi Völler", pais:"Alemanha", posicao:"Avançado",
+    ligas:["Serie A","Ligue 1"], clubes:["Roma","Marseille","Bayer Leverkusen"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Bastian Schweinsteiger", pais:"Alemanha", posicao:"Médio",
+    ligas:["Bundesliga","Premier League"], clubes:["Bayern Munich","Manchester United"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Liga dos Campeões",v:1},{n:"Bundesliga",v:8}] },
+  { nome:"Mario Götze", pais:"Alemanha", posicao:"Médio",
+    ligas:["Bundesliga"], clubes:["Bayern Munich","Dortmund"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Bundesliga",v:4},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Lukas Podolski", pais:"Alemanha", posicao:"Avançado",
+    ligas:["Bundesliga","Premier League","La Liga"], clubes:["Arsenal","Bayern Munich","Galatasaray","Inter Milão"],
+    trofeus:[{n:"Copa do Mundo",v:1},{n:"Bundesliga",v:1}] },
+  { nome:"Per Mertesacker", pais:"Alemanha", posicao:"Defesa",
+    ligas:["Premier League","Bundesliga"], clubes:["Arsenal","Werder Bremen","Hannover"],
+    trofeus:[{n:"Copa do Mundo",v:1}] },
+  // Holanda extras
+  { nome:"Ronald Koeman", pais:"Holanda", posicao:"Defesa",
+    ligas:["La Liga","Premier League"], clubes:["Barcelona","Everton","Southampton","PSV"],
+    trofeus:[{n:"La Liga",v:1},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Marc Overmars", pais:"Holanda", posicao:"Avançado",
+    ligas:["La Liga","Premier League"], clubes:["Barcelona","Arsenal","Ajax"],
+    trofeus:[{n:"La Liga",v:1},{n:"Premier League",v:2},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Jaap Stam", pais:"Holanda", posicao:"Defesa",
+    ligas:["Premier League","Serie A","La Liga"], clubes:["Manchester United","Lazio","AC Milan","PSV"],
+    trofeus:[{n:"Premier League",v:3},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Phillip Cocu", pais:"Holanda", posicao:"Médio",
+    ligas:["La Liga"], clubes:["Barcelona","PSV","Fenerbahçe"],
+    trofeus:[{n:"La Liga",v:3},{n:"Liga dos Campeões",v:1}] },
+  { nome:"Memphis Depay", pais:"Holanda", posicao:"Avançado",
+    ligas:["La Liga","Ligue 1","Premier League"], clubes:["Barcelona","Atlético Madrid","Lyon","Manchester United"],
+    trofeus:[{n:"La Liga",v:1}] },
+  { nome:"Georginio Wijnaldum", pais:"Holanda", posicao:"Médio",
+    ligas:["Premier League","Ligue 1"], clubes:["Liverpool","PSG","Newcastle","Barcelona"],
+    trofeus:[{n:"Liga dos Campeões",v:1},{n:"Premier League",v:1}] },
+  // UK extras
+  { nome:"Ryan Giggs", pais:"Gales", posicao:"Médio",
+    ligas:["Premier League"], clubes:["Manchester United"],
+    trofeus:[{n:"Premier League",v:13},{n:"Liga dos Campeões",v:2}] },
+  { nome:"Gareth Bale", pais:"Gales", posicao:"Avançado",
+    ligas:["La Liga","Premier League"], clubes:["Real Madrid","Tottenham"],
+    trofeus:[{n:"La Liga",v:3},{n:"Liga dos Campeões",v:4}] },
+  { nome:"Alan Shearer", pais:"Inglaterra", posicao:"Avançado",
+    ligas:["Premier League"], clubes:["Newcastle","Blackburn","Southampton"],
+    trofeus:[{n:"Premier League",v:1}] },
+  { nome:"Peter Shilton", pais:"Inglaterra", posicao:"Guarda-Redes",
+    ligas:["Premier League"], clubes:["Nottingham Forest","Leicester","Southampton"],
+    trofeus:[{n:"Liga dos Campeões",v:2}] },
+  { nome:"Paul Gascoigne", pais:"Inglaterra", posicao:"Médio",
+    ligas:["Premier League","Serie A","La Liga"], clubes:["Tottenham","Lazio","Rangers","Newcastle"],
+    trofeus:[] },
+  { nome:"Patrick Kluivert", pais:"Holanda", posicao:"Avançado",
+    ligas:["La Liga","Serie A","Premier League"], clubes:["Barcelona","AC Milan","Ajax","Newcastle"],
+    trofeus:[{n:"La Liga",v:3},{n:"Liga dos Campeões",v:2},{n:"Serie A",v:1}] },];
+
+// ─── CATEGORIES ──────────────────────────────────────────────────────────────
+// Type: 'liga_jogou' = played in league; 'liga_venceu' = won league; 'clube' = played for club; 'pais' = nationality; 'posicao'; 'ucl_venceu' = won UCL; 'ballondor'; 'mundial'
+const CATEGORIAS = [
+  // Ligas — jogou
+  { id:"jg-pl",   type:"liga_jogou",  liga:"Premier League", nome:"Jogou na Premier League",    visual:{tipo:"liga", liga:"Premier League"} },
+  { id:"jg-ll",   type:"liga_jogou",  liga:"La Liga",        nome:"Jogou na La Liga",           visual:{tipo:"liga", liga:"La Liga"} },
+  { id:"jg-sa",   type:"liga_jogou",  liga:"Serie A",        nome:"Jogou na Serie A",           visual:{tipo:"liga", liga:"Serie A"} },
+  { id:"jg-bl",   type:"liga_jogou",  liga:"Bundesliga",     nome:"Jogou na Bundesliga",        visual:{tipo:"liga", liga:"Bundesliga"} },
+  { id:"jg-l1",   type:"liga_jogou",  liga:"Ligue 1",        nome:"Jogou na Ligue 1",           visual:{tipo:"liga", liga:"Ligue 1"} },
+  { id:"jg-pt",   type:"liga_jogou",  liga:"Primeira Liga",  nome:"Jogou na Primeira Liga",     visual:{tipo:"liga", liga:"Primeira Liga"} },
+  // Ligas — ganhou
+  { id:"vn-pl",   type:"liga_venceu", liga:"Premier League", nome:"Vencedor da Premier League", visual:{tipo:"trofeu_liga", liga:"Premier League"} },
+  { id:"vn-ll",   type:"liga_venceu", liga:"La Liga",        nome:"Vencedor da La Liga",        visual:{tipo:"trofeu_liga", liga:"La Liga"} },
+  { id:"vn-sa",   type:"liga_venceu", liga:"Serie A",        nome:"Vencedor da Serie A",        visual:{tipo:"trofeu_liga", liga:"Serie A"} },
+  { id:"vn-bl",   type:"liga_venceu", liga:"Bundesliga",     nome:"Vencedor da Bundesliga",     visual:{tipo:"trofeu_liga", liga:"Bundesliga"} },
+  // Champions
+  { id:"vn-ucl",  type:"ucl_venceu",  nome:"Vencedor da Champions",   visual:{tipo:"ucl"} },
+  { id:"vn-ucl2", type:"ucl_venceu2", nome:"2× Vencedor Champions",   visual:{tipo:"ucl_multi", n:"2×"} },
+  { id:"vn-ucl3", type:"ucl_venceu3", nome:"3× Vencedor Champions",   visual:{tipo:"ucl_multi", n:"3×"} },
+  // Individual
+  { id:"ballon",  type:"ballondor",   nome:"Ballon d'Or",             visual:{tipo:"emoji", e:"🥇"} },
+  { id:"mundial", type:"mundial",     nome:"Campeão Mundial",         visual:{tipo:"mundial"} },
+  { id:"euro",    type:"euro",        nome:"Campeão Europeu",         visual:{tipo:"emoji", e:"🏅"} },
+  // Clubes
+  { id:"cl-rm",   type:"clube", clube:"Real Madrid",        nome:"Real Madrid",        visual:{tipo:"clube", clube:"Real Madrid"} },
+  { id:"cl-barca",type:"clube", clube:"Barcelona",          nome:"Barcelona",          visual:{tipo:"clube", clube:"Barcelona"} },
+  { id:"cl-mu",   type:"clube", clube:"Manchester United",  nome:"Manchester United",  visual:{tipo:"clube", clube:"Manchester United"} },
+  { id:"cl-mc",   type:"clube", clube:"Manchester City",    nome:"Manchester City",    visual:{tipo:"clube", clube:"Manchester City"} },
+  { id:"cl-lfc",  type:"clube", clube:"Liverpool",          nome:"Liverpool",          visual:{tipo:"clube", clube:"Liverpool"} },
+  { id:"cl-che",  type:"clube", clube:"Chelsea",            nome:"Chelsea",            visual:{tipo:"clube", clube:"Chelsea"} },
+  { id:"cl-ars",  type:"clube", clube:"Arsenal",            nome:"Arsenal",            visual:{tipo:"clube", clube:"Arsenal"} },
+  { id:"cl-acm",  type:"clube", clube:"AC Milan",           nome:"AC Milan",           visual:{tipo:"clube", clube:"AC Milan"} },
+  { id:"cl-juv",  type:"clube", clube:"Juventus",           nome:"Juventus",           visual:{tipo:"clube", clube:"Juventus"} },
+  { id:"cl-bay",  type:"clube", clube:"Bayern Munich",      nome:"Bayern Munich",      visual:{tipo:"clube", clube:"Bayern Munich"} },
+  { id:"cl-psg",  type:"clube", clube:"PSG",                nome:"PSG",                visual:{tipo:"clube", clube:"PSG"} },
+  { id:"cl-int",  type:"clube", clube:"Inter Milão",        nome:"Inter Milão",        visual:{tipo:"clube", clube:"Inter Milão"} },
+  { id:"cl-ajax", type:"clube", clube:"Ajax",               nome:"Ajax",               visual:{tipo:"clube", clube:"Ajax"} },
+  { id:"cl-benf", type:"clube", clube:"Benfica",            nome:"Benfica",            visual:{tipo:"clube", clube:"Benfica"} },
+  { id:"cl-bvb",  type:"clube", clube:"Dortmund",           nome:"Dortmund",           visual:{tipo:"clube", clube:"Dortmund"} },
+  { id:"cl-atm",  type:"clube", clube:"Atlético Madrid",    nome:"Atlético Madrid",    visual:{tipo:"clube", clube:"Atlético Madrid"} },
+  { id:"cl-port", type:"clube", clube:"Porto",              nome:"Porto",              visual:{tipo:"clube", clube:"Porto"} },
+  { id:"cl-nap",  type:"clube", clube:"Napoli",             nome:"Napoli",             visual:{tipo:"clube", clube:"Napoli"} },
+  // Países
+  { id:"pt-pt",   type:"pais", pais:"Portugal",   nome:"Portugal",   visual:{tipo:"flag", pais:"Portugal"} },
+  { id:"pt-br",   type:"pais", pais:"Brasil",     nome:"Brasil",     visual:{tipo:"flag", pais:"Brasil"} },
+  { id:"pt-ar",   type:"pais", pais:"Argentina",  nome:"Argentina",  visual:{tipo:"flag", pais:"Argentina"} },
+  { id:"pt-fr",   type:"pais", pais:"França",     nome:"França",     visual:{tipo:"flag", pais:"França"} },
+  { id:"pt-es",   type:"pais", pais:"Espanha",    nome:"Espanha",    visual:{tipo:"flag", pais:"Espanha"} },
+  { id:"pt-de",   type:"pais", pais:"Alemanha",   nome:"Alemanha",   visual:{tipo:"flag", pais:"Alemanha"} },
+  { id:"pt-it",   type:"pais", pais:"Itália",     nome:"Itália",     visual:{tipo:"flag", pais:"Itália"} },
+  { id:"pt-nl",   type:"pais", pais:"Holanda",    nome:"Holanda",    visual:{tipo:"flag", pais:"Holanda"} },
+  { id:"pt-en",   type:"pais", pais:"Inglaterra", nome:"Inglaterra", visual:{tipo:"flag", pais:"Inglaterra"} },
+  { id:"pt-cr",   type:"pais", pais:"Croácia",    nome:"Croácia",    visual:{tipo:"flag", pais:"Croácia"} },
+  { id:"pt-ur",   type:"pais", pais:"Uruguai",    nome:"Uruguai",    visual:{tipo:"flag", pais:"Uruguai"} },
+  // Posições
+  { id:"pos-gr",  type:"posicao", posicao:"Guarda-Redes", nome:"Guarda-Redes", visual:{tipo:"emoji", e:"🧤"} },
+  { id:"pos-def", type:"posicao", posicao:"Defesa",       nome:"Defesa",       visual:{tipo:"emoji", e:"🛡️"} },
+  { id:"pos-med", type:"posicao", posicao:"Médio",        nome:"Médio",        visual:{tipo:"emoji", e:"⚙️"} },
+  { id:"pos-av",  type:"posicao", posicao:"Avançado",     nome:"Avançado",     visual:{tipo:"emoji", e:"⚡"} },
+];
+
+// ─── CHECK FUNCTIONS ─────────────────────────────────────────────────────────
+function checkCat(cat, j) {
+  switch(cat.type) {
+    case "liga_jogou":   return j.ligas.includes(cat.liga);
+    case "liga_venceu":  return j.trofeus.some(t => t.n === cat.liga);
+    case "ucl_venceu":   return j.trofeus.some(t => t.n === "Liga dos Campeões" && t.v >= 1);
+    case "ucl_venceu2":  return j.trofeus.some(t => t.n === "Liga dos Campeões" && t.v >= 2);
+    case "ucl_venceu3":  return j.trofeus.some(t => t.n === "Liga dos Campeões" && t.v >= 3);
+    case "ballondor":    return j.trofeus.some(t => (t.n === "Ballon d'Or" || t.n === "Bola de Ouro") && t.v >= 1);
+    case "mundial":      return j.trofeus.some(t => t.n === "Copa do Mundo");
+    case "euro":         return j.trofeus.some(t => t.n === "Euro");
+    case "clube":        return j.clubes.includes(cat.clube);
+    case "pais":         return j.pais === cat.pais;
+    case "posicao":      return j.posicao === cat.posicao;
+    default: return false;
+  }
+}
+
+// ─── CELL LABEL ──────────────────────────────────────────────────────────────
+function getCellLabel(cat, j) {
+  if (cat.type === "liga_venceu" && j) {
+    const t = j.trofeus.find(t => t.n === cat.liga);
+    if (t && t.v > 1) return `${t.v}× Vencedor`;
+    return "Vencedor";
+  }
+  if (cat.type === "ucl_venceu" && j) {
+    const t = j.trofeus.find(t => t.n === "Liga dos Campeões");
+    if (t && t.v > 1) return `${t.v}× Vencedor`;
+    return "Vencedor";
+  }
+  if ((cat.type === "ucl_venceu2" || cat.type === "ucl_venceu3") && j) {
+    const t = j.trofeus.find(t => t.n === "Liga dos Campeões");
+    if (t) return `${t.v}× Vencedor`;
+  }
+  return cat.nome;
+}
+
+// ─── CELL VISUAL HTML ─────────────────────────────────────────────────────────
+
+function makeBadge(d, w, r) {
+  if (!d) return '<span class="c-emoji">⚽</span>';
+  w = w || 36; r = r || 6;
+  var fs = d.t.length >= 4 ? 9 : d.t.length === 3 ? 11 : 13;
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + w + '" viewBox="0 0 ' + w + ' ' + w + '" style="display:block;flex-shrink:0">'
+    + '<rect width="' + w + '" height="' + w + '" rx="' + r + '" fill="' + d.bg + '" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>'
+    + '<text x="' + (w/2) + '" y="' + (w/2 + fs*0.38) + '" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="' + fs + '" font-weight="900" fill="' + d.fg + '" letter-spacing="-0.5">' + d.t + '</text>'
+    + '</svg>';
+}
+
+function visualHTML(v) {
+  if (!v) return '<div class="c-vis"><span class="c-emoji">?</span></div>';
+
+  if (v.tipo === 'emoji')
+    return '<div class="c-vis"><span class="c-emoji">' + v.e + '</span></div>';
+
+  if (v.tipo === 'ucl_multi')
+    return '<div class="c-vis" style="display:flex;flex-direction:column;align-items:center;gap:2px">'
+      + '<span style="font-size:1.2rem;line-height:1">&#127942;</span>'
+      + '<span style="font-family:Bebas Neue,sans-serif;font-size:.7rem;letter-spacing:1px;color:#fbbf24;line-height:1">' + v.n + '</span></div>';
+
+  if (v.tipo === 'flag') {
+    var f = FLAGS[v.pais] || '?';
+    return '<div class="c-vis"><span class="c-flag">' + f + '</span></div>';
+  }
+
+  if (v.tipo === 'mundial')
+    return '<div class="c-vis"><span style="font-size:1.8rem">&#127942;</span></div>';
+
+  if (v.tipo === 'liga') {
+    var d = LEAGUE_BADGES[v.liga];
+    if (!d) return '<div class="c-vis"><span class="c-emoji">🏅</span></div>';
+    if (typeof d === 'string') return '<div class="c-vis"><img src="' + d + '" style="width:36px;height:36px;object-fit:contain"></div>';
+    return '<div class="c-vis">' + makeBadge(d, 36, 7) + '</div>';
+  }
+
+  if (v.tipo === 'trofeu_liga') {
+    var d2 = LEAGUE_BADGES[v.liga];
+    var ligaHtml = '';
+    if (d2 && typeof d2 === 'string') ligaHtml = '<img src="' + d2 + '" style="width:22px;height:22px;object-fit:contain">';
+    else if (d2) ligaHtml = makeBadge(d2, 22, 4);
+    return '<div class="c-vis" style="display:flex;flex-direction:column;align-items:center;gap:2px">'
+      + '<span style="font-size:1rem;line-height:1">&#127942;</span>'
+      + ligaHtml + '</div>';
+  }
+
+  if (v.tipo === 'ucl') {
+    var d3 = LEAGUE_BADGES['Liga dos Campeões'];
+    if (!d3) return '<div class="c-vis"><span class="c-emoji">⭐</span></div>';
+    if (typeof d3 === 'string') return '<div class="c-vis"><img src="' + d3 + '" style="width:36px;height:36px;object-fit:contain"></div>';
+    return '<div class="c-vis">' + makeBadge(d3, 36, 7) + '</div>';
+  }
+
+  if (v.tipo === 'clube') {
+    var d4 = CLUB_LOGOS[v.clube];
+    if (!d4) return '<div class="c-vis club-init">' + v.clube.charAt(0) + '</div>';
+    if (typeof d4 === 'string') return '<div class="c-vis"><img src="' + d4 + '" style="width:34px;height:34px;object-fit:contain"></div>';
+    return '<div class="c-vis">' + makeBadge(d4, 34, 6) + '</div>';
+  }
+
+  return '<div class="c-vis"><span class="c-emoji">?</span></div>';
+}
+
+function shuffle(a) { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; }
+
+let state = {};
+let usarTimer = false;
+let isDaily = false;
+let timerEnd = 0, timerIv = null, timerSec = 0;
+let toastT = null;
+
+
+function checkCat(cat, j) {
+  switch(cat.type) {
+    case "liga_jogou":   return j.ligas.includes(cat.liga);
+    case "liga_venceu":  return j.trofeus.some(t => t.n === cat.liga);
+    case "ucl_venceu":   return j.trofeus.some(t => t.n === "Liga dos Campeões" && t.v >= 1);
+    case "ucl_venceu2":  return j.trofeus.some(t => t.n === "Liga dos Campeões" && t.v >= 2);
+    case "ucl_venceu3":  return j.trofeus.some(t => t.n === "Liga dos Campeões" && t.v >= 3);
+    case "ballondor":    return j.trofeus.some(t => (t.n === "Ballon d'Or" || t.n === "Bola de Ouro") && t.v >= 1);
+    case "mundial":      return j.trofeus.some(t => t.n === "Copa do Mundo");
+    case "euro":         return j.trofeus.some(t => t.n === "Euro");
+    case "clube":        return j.clubes.includes(cat.clube);
+    case "pais":         return j.pais === cat.pais;
+    case "posicao":      return j.posicao === cat.posicao;
+    default: return false;
+  }
+}
+
+// ─── CELL LABEL ──────────────────────────────────────────────────────────────
+function getCellLabel(cat, j) {
+  if (cat.type === "liga_venceu" && j) {
+    const t = j.trofeus.find(t => t.n === cat.liga);
+    if (t && t.v > 1) return `${t.v}× Vencedor`;
+    return "Vencedor";
+  }
+  if (cat.type === "ucl_venceu" && j) {
+    const t = j.trofeus.find(t => t.n === "Liga dos Campeões");
+    if (t && t.v > 1) return `${t.v}× Vencedor`;
+    return "Vencedor";
+  }
+  if ((cat.type === "ucl_venceu2" || cat.type === "ucl_venceu3") && j) {
+    const t = j.trofeus.find(t => t.n === "Liga dos Campeões");
+    if (t) return `${t.v}× Vencedor`;
+  }
+  return cat.nome;
+}
+
+// ─── CELL VISUAL HTML ─────────────────────────────────────────────────────────
+
+function makeBadge(d, w, r) {
+  if (!d) return '<span class="c-emoji">⚽</span>';
+  w = w || 36; r = r || 6;
+  var fs = d.t.length >= 4 ? 9 : d.t.length === 3 ? 11 : 13;
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + w + '" viewBox="0 0 ' + w + ' ' + w + '" style="display:block;flex-shrink:0">'
+    + '<rect width="' + w + '" height="' + w + '" rx="' + r + '" fill="' + d.bg + '" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>'
+    + '<text x="' + (w/2) + '" y="' + (w/2 + fs*0.38) + '" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="' + fs + '" font-weight="900" fill="' + d.fg + '" letter-spacing="-0.5">' + d.t + '</text>'
+    + '</svg>';
+}
+
+function visualHTML(v) {
+  if (!v) return '<div class="c-vis"><span class="c-emoji">?</span></div>';
+
+  if (v.tipo === 'emoji')
+    return '<div class="c-vis"><span class="c-emoji">' + v.e + '</span></div>';
+
+  if (v.tipo === 'ucl_multi')
+    return '<div class="c-vis" style="display:flex;flex-direction:column;align-items:center;gap:2px">'
+      + '<span style="font-size:1.2rem;line-height:1">&#127942;</span>'
+      + '<span style="font-family:Bebas Neue,sans-serif;font-size:.7rem;letter-spacing:1px;color:#fbbf24;line-height:1">' + v.n + '</span></div>';
+
+  if (v.tipo === 'flag') {
+    var f = FLAGS[v.pais] || '?';
+    return '<div class="c-vis"><span class="c-flag">' + f + '</span></div>';
+  }
+
+  if (v.tipo === 'mundial')
+    return '<div class="c-vis"><span style="font-size:1.8rem">&#127942;</span></div>';
+
+  if (v.tipo === 'liga') {
+    var d = LEAGUE_BADGES[v.liga];
+    if (!d) return '<div class="c-vis"><span class="c-emoji">🏅</span></div>';
+    if (typeof d === 'string') return '<div class="c-vis"><img src="' + d + '" style="width:36px;height:36px;object-fit:contain"></div>';
+    return '<div class="c-vis">' + makeBadge(d, 36, 7) + '</div>';
+  }
+
+  if (v.tipo === 'trofeu_liga') {
+    var d2 = LEAGUE_BADGES[v.liga];
+    var ligaHtml = '';
+    if (d2 && typeof d2 === 'string') ligaHtml = '<img src="' + d2 + '" style="width:22px;height:22px;object-fit:contain">';
+    else if (d2) ligaHtml = makeBadge(d2, 22, 4);
+    return '<div class="c-vis" style="display:flex;flex-direction:column;align-items:center;gap:2px">'
+      + '<span style="font-size:1rem;line-height:1">&#127942;</span>'
+      + ligaHtml + '</div>';
+  }
+
+  if (v.tipo === 'ucl') {
+    var d3 = LEAGUE_BADGES['Liga dos Campeões'];
+    if (!d3) return '<div class="c-vis"><span class="c-emoji">⭐</span></div>';
+    if (typeof d3 === 'string') return '<div class="c-vis"><img src="' + d3 + '" style="width:36px;height:36px;object-fit:contain"></div>';
+    return '<div class="c-vis">' + makeBadge(d3, 36, 7) + '</div>';
+  }
+
+  if (v.tipo === 'clube') {
+    var d4 = CLUB_LOGOS[v.clube];
+    if (!d4) return '<div class="c-vis club-init">' + v.clube.charAt(0) + '</div>';
+    if (typeof d4 === 'string') return '<div class="c-vis"><img src="' + d4 + '" style="width:34px;height:34px;object-fit:contain"></div>';
+    return '<div class="c-vis">' + makeBadge(d4, 34, 6) + '</div>';
+  }
+
+  return '<div class="c-vis"><span class="c-emoji">?</span></div>';
+}
+
+
+function shuffle(a) {
+  const b = [...a];
+  for (let i = b.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [b[i],b[j]] = [b[j],b[i]];
+  }
+  return b;
+}
+
+// ─── SCREENS ─────────────────────────────────────────────────────────────────
+function startGame(comTimer) {
+  isDaily = false;
+  usarTimer = comTimer;
+  document.getElementById('screen-choose').classList.add('hidden');
+  document.getElementById('screen-game').classList.remove('hidden');
+  document.getElementById('daily-game-banner').style.display = 'none';
+  newGame();
+}
+
+function voltarEscolha() {
+  stopTimer();
+  closeModal();
+  isDaily = false;
+  document.getElementById('daily-game-banner').style.display = 'none';
+  document.getElementById('screen-game').classList.add('hidden');
+  document.getElementById('screen-choose').classList.remove('hidden');
+  initChooseScreen();
+}
+
+function newGame() {
+  stopTimer();
+  state = {
+    cartela:  shuffle(CATEGORIAS).slice(0, 16),
+    fila:     shuffle(JOGADORES),
+    idx:      0,
+    marcados: {},
+    ativo:    true,
+    done:     false
+  };
+  document.getElementById('timer-row').style.display = usarTimer ? 'flex' : 'none';
+  const shareArea = document.getElementById('daily-share-area');
+  if (shareArea) shareArea.remove();
+  renderGrid();
+  renderPlayer();
+  updateScore();
+}
+
+// ─── GRID ─────────────────────────────────────────────────────────────────────
+function renderGrid() {
+  const g = document.getElementById('grid');
+  g.innerHTML = '';
+  state.cartela.forEach((cat, i) => {
+    const d = document.createElement('div');
+    d.className = 'cell';
+    d.id = 'c' + i;
+    d.onclick = () => pick(i);
+    const m = state.marcados[i];
+    if (m && m.nome) {
+      d.classList.add('done');
+      d.innerHTML = visualHTML(cat.visual)
+        + '<div class="c-text">' + cat.nome + '</div>'
+        + '<div class="c-sub">'  + m.nome   + '</div>';
+    } else {
+      d.innerHTML = visualHTML(cat.visual)
+        + '<div class="c-text">' + cat.nome + '</div>';
+    }
+    g.appendChild(d);
+  });
+}
+
+// ─── PLAYER ───────────────────────────────────────────────────────────────────
+function renderPlayer() {
+  if (state.idx >= state.fila.length) { gameOver(); return; }
+  document.getElementById('player-name').textContent = state.fila[state.idx].nome;
+  state.sel = null;
+  document.getElementById('btn-next').disabled = false;
+  startTimer();
+}
+
+// ─── PICK ─────────────────────────────────────────────────────────────────────
+function pick(i) {
+  if (!state.ativo) return;
+  const m = state.marcados[i];
+  if (m && m.nome) return;      // already correctly answered
+  if (m === false) return;      // currently in wrong-answer lockout
+
+  const j   = state.fila[state.idx];
+  const cat = state.cartela[i];
+  const cell = document.getElementById('c' + i);
+
+  if (checkCat(cat, j)) {
+    // ── CORRECT ──────────────────────────────────────────────────────────────
+    stopTimer();
+    state.marcados[i] = { nome: j.nome };
+    cell.classList.remove('wrong');
+    cell.classList.add('done');
+    cell.innerHTML = visualHTML(cat.visual)
+      + '<div class="c-text">' + cat.nome + '</div>'
+      + '<div class="c-sub">'  + j.nome   + '</div>';
+    toast('✅ ' + j.nome + ' → ' + cat.nome, 'ok');
+    updateScore();
+
+    if (isDaily) {
+      saveDailyState(state.idx + 1, state.marcados, false);
+      renderDailyDots();
+    }
+
+    // check bingo (16 cells correctly filled)
+    const hits = Object.values(state.marcados).filter(v => v && v.nome).length;
+    if (hits === 16 && !state.done) {
+      state.done = true;
+      state.ativo = false;
+      state.idx++;
+      document.getElementById('btn-next').disabled = true;
+      if (isDaily) {
+        saveDailyState(state.idx, state.marcados, true);
+        showDailyShare();
+      }
+      setTimeout(() => showEndModal(true), 700);
+    } else {
+      state.idx++;
+      setTimeout(renderPlayer, 500);
+    }
+
+  } else {
+    // ── WRONG ────────────────────────────────────────────────────────────────
+    state.ativo = false;
+    cell.classList.add('wrong');
+    toast('❌ Errado! A passar ao próximo...', 'err');
+    stopTimer();
+
+    setTimeout(() => {
+      cell.classList.remove('wrong');
+      state.ativo = true;
+      state.idx++;
+      if (isDaily) {
+        saveDailyState(state.idx, state.marcados, false);
+        renderDailyDots();
+      }
+      renderPlayer();
+      updateScore();
+    }, 1200);
+  }
+}
+
+function nextPlayer() {
+  if (!state.ativo || state.done) return;
+  stopTimer();
+  state.idx++;
+  if (isDaily) {
+    saveDailyState(state.idx, state.marcados, false);
+    renderDailyDots();
+  }
+  renderPlayer();
+  updateScore();
+}
+
+function gameOver() {
+  state.ativo = false;
+  stopTimer();
+  document.getElementById('btn-next').disabled = true;
+  document.getElementById('player-name').textContent = 'Sem mais jogadores';
+  setTimeout(() => showEndModal(false), 700);
+}
+
+function updateScore() {
+  const hits = Object.values(state.marcados).filter(v => v && v.nome).length;
+  document.getElementById('sc-m').textContent = hits;
+  const jEl = document.getElementById('sc-j');
+  const tEl = document.getElementById('sc-total');
+  if (jEl) jEl.textContent = Math.min(state.idx + 1, state.fila.length);
+  if (tEl) tEl.textContent = state.fila.length;
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function showEndModal(bingo) {
+  const hits  = Object.values(state.marcados).filter(v => v && v.nome).length;
+  const modal = document.getElementById('modal');
+  const title = document.getElementById('modal-title');
+  const msg   = document.getElementById('modal-msg');
+  if (!modal) return;
+  if (bingo) {
+    title.textContent = '🎉 BINGO!';
+    msg.textContent   = 'Completaste a cartela com ' + state.idx + ' jogadores!';
+  } else {
+    title.textContent = 'Jogo terminado';
+    msg.textContent   = hits + ' de 16 categorias preenchidas.';
+  }
+  modal.classList.add('show');
+}
+
+function closeModal() {
+  const modal = document.getElementById('modal');
+  if (modal) modal.classList.remove('show');
+}
+
+// ─── TIMER ────────────────────────────────────────────────────────────────────
+function startTimer() {
+  stopTimer();
+  if (!usarTimer) return;
+  timerEnd = Date.now() + 10000;
+  updateTimerUI();
+  timerIv = setInterval(() => {
+    const rem = Math.ceil((timerEnd - Date.now()) / 1000);
+    timerSec = Math.max(0, rem);
+    updateTimerUI();
+    if (timerSec <= 0) { stopTimer(); nextPlayer(); }
+  }, 250);
+}
+
+function stopTimer() {
+  clearInterval(timerIv);
+  timerIv = null;
+}
+
+function updateTimerUI() {
+  const bar = document.getElementById('timer-bar');
+  const lbl = document.getElementById('timer-lbl');
+  if (bar) bar.style.width = (timerSec / 10 * 100) + '%';
+  if (lbl) lbl.textContent = timerSec + 's';
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+function toast(msg, cls) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent  = msg;
+  t.className    = 'toast ' + cls + ' show';
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+
+function getDailyKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function dailySeed(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+  return Math.abs(h);
+}
+
+function seededShuffle(arr, seed) {
+  const a = [...arr];
+  let s = seed;
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    const j = Math.abs(s) % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function getDailyCartela() {
+  return seededShuffle(CATEGORIAS, dailySeed(getDailyKey())).slice(0, 16);
+}
+
+function getDailyFila() {
+  const seed    = dailySeed(getDailyKey() + '_fila');
+  const cartela = getDailyCartela();
+  const TARGET  = 40;
+  const MIN_PER_CAT = 2;
+
+  // Seeded shuffle of all players
+  const all = seededShuffle(JOGADORES, seed);
+
+  // Build pool: ensure each category has at least MIN_PER_CAT players
+  const selected = new Set();
+  const catHits  = new Array(16).fill(0);
+
+  // Pass 1: for each category, pick first MIN_PER_CAT matching players from shuffled list
+  for (let ci = 0; ci < 16; ci++) {
+    const cat = cartela[ci];
+    let found = 0;
+    for (let pi = 0; pi < all.length && found < MIN_PER_CAT; pi++) {
+      if (checkCat(cat, all[pi])) {
+        selected.add(pi);
+        found++;
+        catHits[ci] = found;
+      }
+    }
+  }
+
+  // Pass 2: fill remaining slots up to TARGET from shuffled order
+  for (let pi = 0; pi < all.length && selected.size < TARGET; pi++) {
+    selected.add(pi);
+  }
+
+  // Return players in original seeded-shuffle order (deterministic)
+  return [...selected].sort((a,b) => a-b).map(i => all[i]);
+}
+
+function loadDailyState() {
+  try {
+    const raw = localStorage.getItem('daily_' + getDailyKey());
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    // Validate format - marcados values must be objects with nome or false
+    if (s.marcados) {
+      for (const k of Object.keys(s.marcados)) {
+        const v = s.marcados[k];
+        // Accept {nome:...} or false; reject old formats (true, {jogador:...})
+        if (v !== false && !(v && typeof v === 'object' && v.nome)) {
+          console.warn('Daily: stale/invalid saved state, resetting');
+          return null;
+        }
+      }
+    }
+    return s;
+  } catch(e) { return null; }
+}
+
+function saveDailyState(idx, marcados, done) {
+  try {
+    const mc = Object.values(marcados).filter(v => v && v.nome).length;
+    localStorage.setItem('daily_' + getDailyKey(), JSON.stringify({
+      idx: idx,
+      marcados: marcados,
+      done: done,
+      marcados_count: mc
+    }));
+  } catch(e) {}
+}
+
+function loadStreak() {
+  try { return parseInt(localStorage.getItem('daily_streak') || '0'); } catch(e) { return 0; }
+}
+
+function updateStreak() {
+  try {
+    const last = localStorage.getItem('daily_streak_last');
+    const today = getDailyKey();
+    if (last === today) return;
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    const yesterday = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    let streak = loadStreak();
+    streak = (last === yesterday) ? streak + 1 : 1;
+    localStorage.setItem('daily_streak', streak);
+    localStorage.setItem('daily_streak_last', today);
+  } catch(e) {}
+}
+
+function initChooseScreen() {
+  const saved = loadDailyState();
+  const desc  = document.getElementById('daily-choose-desc');
+  const badge = document.getElementById('daily-badge');
+  if (!desc || !badge) return;
+  if (saved && saved.done) {
+    desc.textContent  = '\u2705 J\u00e1 jogaste hoje \u2014 ' + (saved.marcados_count || 0) + '/16';
+    badge.textContent = 'FEITO';
+    badge.style.background = 'rgba(61,220,132,.3)';
+    badge.style.color      = 'var(--green)';
+  } else {
+    const d = new Date();
+    desc.textContent  = 'Cartela de ' + d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
+    badge.textContent = 'HOJE';
+    badge.style.background = '';
+    badge.style.color      = '';
+  }
+}
+
+function startDailyGame() {
+  isDaily  = true;
+  usarTimer = false;
+  const saved   = loadDailyState();
+  const cartela = getDailyCartela();
+  const fila    = getDailyFila();
+
+  if (saved && saved.done) {
+    state = { cartela, fila, idx: saved.idx, marcados: saved.marcados, ativo: false, done: true };
+  } else if (saved && !saved.done) {
+    state = { cartela, fila, idx: saved.idx, marcados: saved.marcados, ativo: true,  done: false };
+  } else {
+    state = { cartela, fila, idx: 0, marcados: {}, ativo: true, done: false };
+    updateStreak();
+  }
+
+  document.getElementById('timer-row').style.display = 'none';
+  document.getElementById('screen-choose').classList.add('hidden');
+  document.getElementById('screen-game').classList.remove('hidden');
+
+  const banner = document.getElementById('daily-game-banner');
+  if (banner) {
+    banner.style.display = 'block';
+    const d = new Date();
+    document.getElementById('daily-display-date').textContent =
+      d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
+    document.getElementById('streak-num').textContent = loadStreak();
+  }
+
+  renderGrid();
+  renderPlayer();
+  updateScore();
+  renderDailyDots();
+
+  if (state.done) {
+    setTimeout(() => showDailyShare(), 300);
+  }
+}
+
+function renderDailyDots() {
+  const container = document.getElementById('daily-dots');
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i = 0; i < state.idx; i++) {
+    const dot = document.createElement('div');
+    const v   = state.marcados[i];
+    dot.className = 'daily-dot ' + (v && v.nome ? 'hit' : v === false ? 'miss' : 'skip');
+    container.appendChild(dot);
+  }
+}
+
+function showDailyShare() {
+  const banner = document.getElementById('daily-game-banner');
+  if (!banner || document.getElementById('daily-share-area')) return;
+  const hits = Object.values(state.marcados).filter(v => v && v.nome).length;
+  const div  = document.createElement('div');
+  div.id = 'daily-share-area';
+  div.innerHTML =
+    '<div class="daily-completed-msg">\uD83C\uDFC6 Desafio completo! ' + hits + '/16 acertos</div>' +
+    '<button class="daily-share-btn" onclick="copyShare()">\uD83D\uDCCB Copiar resultado</button>';
+  banner.appendChild(div);
+}
+
+function buildShareText() {
+  const saved = loadDailyState();
+  if (!saved) return '';
+  const hits = Object.values(saved.marcados).filter(v => v && v.nome).length;
+  let dots = '';
+  for (let i = 0; i < saved.idx; i++) {
+    const v = saved.marcados[i];
+    dots += (v && v.nome) ? '\uD83D\uDFE9' : (v === false ? '\uD83D\uDFE5' : '\u2B1C');
+  }
+  let rows = '';
+  for (let i = 0; i < dots.length; i += 16) rows += dots.slice(i, i+16) + '\n';
+  return '\u26BD Bingo de Futebol \u2014 ' + getDailyKey() + '\n' + hits + '/' + saved.idx + ' acertos\n\n' + rows.trim();
+}
+
+function copyShare() {
+  const txt = buildShareText();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(txt).then(() => toast('\u2705 Copiado!', 'ok'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('\u2705 Copiado!', 'ok');
+  }
+}
+
+
+
+document.addEventListener('DOMContentLoaded', () => { initChooseScreen(); });
+</script>
+</body>
+</html>
