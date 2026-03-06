@@ -178,6 +178,11 @@ html, body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(-
   .c-vis .c-flag { font-size:1.3rem; }
 }
 
+/* ─── LIGA PT ─── */
+.liga-pt-btn { border-color: rgba(0,100,50,.4); background: linear-gradient(135deg, rgba(0,150,60,.07), rgba(0,80,30,.03)); }
+.liga-pt-btn:hover { border-color: #3ddc84; background: linear-gradient(135deg, rgba(0,150,60,.15), rgba(0,80,30,.08)); }
+
+
 /* ─── DAILY CHALLENGE ─── */
 .daily-banner {
   background: linear-gradient(135deg, #1a2a1a, #0d1f0d);
@@ -262,6 +267,20 @@ html, body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(-
         </div>
       </button>
       <div class="mode-divider">— ou jogo livre —</div>
+      <button class="choose-btn liga-pt-btn" onclick="startLigaPT(false)">
+        <div class="choose-icon">🇵🇹</div>
+        <div>
+          <span class="choose-name">Liga Portuguesa</span>
+          <span class="choose-desc">Jogadores históricos da Liga NOS — sem limite de tempo</span>
+        </div>
+      </button>
+      <button class="choose-btn liga-pt-btn" onclick="startLigaPT(true)">
+        <div class="choose-icon">🇵🇹⏱️</div>
+        <div>
+          <span class="choose-name">Liga Portuguesa — 10s</span>
+          <span class="choose-desc">Modo Liga PT com 10 segundos por jogador</span>
+        </div>
+      </button>
       <button class="choose-btn" onclick="startGame(false)">
         <div class="choose-icon">♾️</div>
         <div>
@@ -284,7 +303,7 @@ html, body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(-
 <div class="screen hidden" id="screen-game">
   <div class="game-wrap">
     <div class="top-bar">
-      <div class="g-title">⚽ Bingo de Futebol</div>
+      <div class="g-title" id="g-title-text">⚽ Bingo de Futebol</div>
       <div class="top-right">
         <div class="score-pill"><strong id="sc-m">0</strong>/16</div><div class="score-pill" id="sc-jogador-pill"><strong id="sc-j">—</strong>/<span id="sc-total">—</span></div>
         <button class="btn-reset" onclick="voltarEscolha()">↺ Novo</button>
@@ -1075,109 +1094,654 @@ const CATEGORIAS = [
   { id:"pos-av",  type:"posicao", posicao:"Avançado",     nome:"Avançado",     visual:{tipo:"emoji", e:"⚡"} },
 ];
 
-// ─── CHECK FUNCTIONS ─────────────────────────────────────────────────────────
-function checkCat(cat, j) {
-  switch(cat.type) {
-    case "liga_jogou":   return j.ligas.includes(cat.liga);
-    case "liga_venceu":  return j.trofeus.some(t => t.n === cat.liga);
-    case "ucl_venceu":   return j.trofeus.some(t => t.n === "Liga dos Campeões" && t.v >= 1);
-    case "ucl_venceu2":  return j.trofeus.some(t => t.n === "Liga dos Campeões" && t.v >= 2);
-    case "ucl_venceu3":  return j.trofeus.some(t => t.n === "Liga dos Campeões" && t.v >= 3);
-    case "ballondor":    return j.trofeus.some(t => (t.n === "Ballon d'Or" || t.n === "Bola de Ouro") && t.v >= 1);
-    case "mundial":      return j.trofeus.some(t => t.n === "Copa do Mundo");
-    case "euro":         return j.trofeus.some(t => t.n === "Euro");
-    case "clube":        return j.clubes.includes(cat.clube);
-    case "pais":         return j.pais === cat.pais;
-    case "posicao":      return j.posicao === cat.posicao;
-    default: return false;
-  }
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// LIGA PORTUGUESA — base de dados dedicada
+// ═══════════════════════════════════════════════════════════════════════════
 
-// ─── CELL LABEL ──────────────────────────────────────────────────────────────
-function getCellLabel(cat, j) {
-  if (cat.type === "liga_venceu" && j) {
-    const t = j.trofeus.find(t => t.n === cat.liga);
-    if (t && t.v > 1) return `${t.v}× Vencedor`;
-    return "Vencedor";
-  }
-  if (cat.type === "ucl_venceu" && j) {
-    const t = j.trofeus.find(t => t.n === "Liga dos Campeões");
-    if (t && t.v > 1) return `${t.v}× Vencedor`;
-    return "Vencedor";
-  }
-  if ((cat.type === "ucl_venceu2" || cat.type === "ucl_venceu3") && j) {
-    const t = j.trofeus.find(t => t.n === "Liga dos Campeões");
-    if (t) return `${t.v}× Vencedor`;
-  }
-  return cat.nome;
-}
+const LIGA_PT_CLUBES_VISUAIS = {
+  "Benfica":          {bg:"#CC0000", fg:"#FFFFFF", t:"SLB"},
+  "Porto":            {bg:"#003087", fg:"#FFFFFF", t:"FCP"},
+  "Sporting CP":      {bg:"#006633", fg:"#FFD700", t:"SCP"},
+  "Boavista":         {bg:"#000000", fg:"#F5C518", t:"BFC"},
+  "Braga":            {bg:"#CC0000", fg:"#FFFFFF", t:"SCB"},
+  "Vitória Guimarães":{bg:"#1a1a1a", fg:"#F5C518", t:"VGC"},
+  "Vitória Setúbal":  {bg:"#003087", fg:"#FFFFFF", t:"VSC"},
+  "Belenenses":       {bg:"#003087", fg:"#FFFFFF", t:"CFB"},
+  "Académica":        {bg:"#000000", fg:"#FFFFFF", t:"AAC"},
+  "Nacional":         {bg:"#CC0000", fg:"#000000", t:"NDC"},
+  "Marítimo":         {bg:"#009900", fg:"#CC0000", t:"CSM"},
+  "Setúbal":          {bg:"#003087", fg:"#FFFFFF", t:"VSC"},
+  "Paços Ferreira":   {bg:"#FFD700", fg:"#000000", t:"FCF"},
+  "Rio Ave":          {bg:"#006600", fg:"#FFFFFF", t:"RAF"},
+  "Famalicão":        {bg:"#CC0000", fg:"#FFFFFF", t:"FCF"},
+  "Gil Vicente":      {bg:"#000080", fg:"#FFFFFF", t:"GVF"},
+  "Marítimo":         {bg:"#009900", fg:"#CC0000", t:"CSM"},
+  "Académica":        {bg:"#000000", fg:"#FFFFFF", t:"AAC"},
+  "Nacional":         {bg:"#000000", fg:"#CC0000", t:"NDC"},
+  "Paços Ferreira":   {bg:"#FFD700", fg:"#000000", t:"FCF"},
+  "Rio Ave":          {bg:"#006600", fg:"#FFFFFF", t:"RAF"},
+  "Famalicão":        {bg:"#CC0000", fg:"#FFFFFF", t:"FCF"},
+  "Gil Vicente":      {bg:"#000080", fg:"#FFFFFF", t:"GVF"},
+  "Estoril":          {bg:"#FFD700", fg:"#003399", t:"EPC"},
+  "Moreirense":       {bg:"#003087", fg:"#FFFFFF", t:"MFC"},
+  "Arouca":           {bg:"#009900", fg:"#FFFFFF", t:"AFC"},
+  "Moreirense":       {bg:"#003087", fg:"#FFFFFF", t:"MFC"},
+};
 
-// ─── CELL VISUAL HTML ─────────────────────────────────────────────────────────
-
-function makeBadge(d, w, r) {
-  if (!d) return '<span class="c-emoji">⚽</span>';
-  w = w || 36; r = r || 6;
-  var fs = d.t.length >= 4 ? 9 : d.t.length === 3 ? 11 : 13;
-  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + w + '" viewBox="0 0 ' + w + ' ' + w + '" style="display:block;flex-shrink:0">'
-    + '<rect width="' + w + '" height="' + w + '" rx="' + r + '" fill="' + d.bg + '" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>'
-    + '<text x="' + (w/2) + '" y="' + (w/2 + fs*0.38) + '" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="' + fs + '" font-weight="900" fill="' + d.fg + '" letter-spacing="-0.5">' + d.t + '</text>'
+function makeLigaPTBadge(clube, w) {
+  w = w || 34;
+  const d = LIGA_PT_CLUBES_VISUAIS[clube] || {bg:"#444",fg:"#fff",t:clube.slice(0,3).toUpperCase()};
+  const fs = d.t.length >= 4 ? 9 : d.t.length === 3 ? 11 : 13;
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+w+'" viewBox="0 0 '+w+' '+w+'" style="display:block">'
+    + '<rect width="'+w+'" height="'+w+'" rx="6" fill="'+d.bg+'" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>'
+    + '<text x="'+(w/2)+'" y="'+(w/2+fs*0.38)+'" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="'+fs+'" font-weight="900" fill="'+d.fg+'" letter-spacing="-0.5">'+d.t+'</text>'
     + '</svg>';
 }
 
-function visualHTML(v) {
-  if (!v) return '<div class="c-vis"><span class="c-emoji">?</span></div>';
+// ── CATEGORIAS Liga PT ────────────────────────────────────────────────────────
+const CATEGORIAS_PT = [
+  // Clubes
+  { id:"pt-slb",  type:"pt_clube", clube:"Benfica",           nome:"Jogou no Benfica",           visual:{tipo:"pt_clube", clube:"Benfica"} },
+  { id:"pt-fcp",  type:"pt_clube", clube:"Porto",             nome:"Jogou no Porto",             visual:{tipo:"pt_clube", clube:"Porto"} },
+  { id:"pt-scp",  type:"pt_clube", clube:"Sporting CP",       nome:"Jogou no Sporting",          visual:{tipo:"pt_clube", clube:"Sporting CP"} },
+  { id:"pt-bfc",  type:"pt_clube", clube:"Boavista",          nome:"Jogou no Boavista",          visual:{tipo:"pt_clube", clube:"Boavista"} },
+  { id:"pt-scb",  type:"pt_clube", clube:"Braga",             nome:"Jogou no Braga",             visual:{tipo:"pt_clube", clube:"Braga"} },
+  { id:"pt-vgc",  type:"pt_clube", clube:"Vitória Guimarães", nome:"Jogou no Vitória Guimarães", visual:{tipo:"pt_clube", clube:"Vitória Guimarães"} },
+  { id:"pt-vsc",  type:"pt_clube", clube:"Vitória Setúbal",   nome:"Jogou no Vitória Setúbal",   visual:{tipo:"pt_clube", clube:"Vitória Setúbal"} },
+  { id:"pt-cfb",  type:"pt_clube", clube:"Belenenses",        nome:"Jogou no Belenenses",        visual:{tipo:"pt_clube", clube:"Belenenses"} },
+  // Mais clubes históricos
+  { id:"pt-mar",  type:"pt_clube", clube:"Marítimo",          nome:"Jogou no Marítimo",          visual:{tipo:"pt_clube", clube:"Marítimo"} },
+  { id:"pt-aca",  type:"pt_clube", clube:"Académica",         nome:"Jogou na Académica",         visual:{tipo:"pt_clube", clube:"Académica"} },
+  { id:"pt-nac",  type:"pt_clube", clube:"Nacional",          nome:"Jogou no Nacional",          visual:{tipo:"pt_clube", clube:"Nacional"} },
+  { id:"pt-pac",  type:"pt_clube", clube:"Paços Ferreira",    nome:"Jogou no Paços Ferreira",    visual:{tipo:"pt_clube", clube:"Paços Ferreira"} },
+  { id:"pt-rio",  type:"pt_clube", clube:"Rio Ave",           nome:"Jogou no Rio Ave",           visual:{tipo:"pt_clube", clube:"Rio Ave"} },
+  { id:"pt-fam",  type:"pt_clube", clube:"Famalicão",         nome:"Jogou no Famalicão",         visual:{tipo:"pt_clube", clube:"Famalicão"} },
+  { id:"pt-gil",  type:"pt_clube", clube:"Gil Vicente",       nome:"Jogou no Gil Vicente",       visual:{tipo:"pt_clube", clube:"Gil Vicente"} },
+  { id:"pt-est",  type:"pt_clube", clube:"Estoril",           nome:"Jogou no Estoril",           visual:{tipo:"pt_clube", clube:"Estoril"} },
+  { id:"pt-mor",  type:"pt_clube", clube:"Moreirense",        nome:"Jogou no Moreirense",        visual:{tipo:"pt_clube", clube:"Moreirense"} },
+  { id:"pt-aro",  type:"pt_clube", clube:"Arouca",            nome:"Jogou no Arouca",            visual:{tipo:"pt_clube", clube:"Arouca"} },
 
-  if (v.tipo === 'emoji')
-    return '<div class="c-vis"><span class="c-emoji">' + v.e + '</span></div>';
+  // Títulos — Liga
+  { id:"pt-lig1", type:"pt_liga_vencedor", vezes:1, nome:"Vencedor da Liga",        visual:{tipo:"emoji", e:"🏆"} },
+  { id:"pt-lig3", type:"pt_liga_vencedor", vezes:3, nome:"Vencedor da Liga 3+ vezes", visual:{tipo:"emoji", e:"🏆🏆🏆"} },
+  // Títulos — Taça
+  { id:"pt-taca", type:"pt_taca",          vezes:1, nome:"Vencedor da Taça de Portugal", visual:{tipo:"emoji", e:"🥇"} },
 
-  if (v.tipo === 'ucl_multi')
-    return '<div class="c-vis" style="display:flex;flex-direction:column;align-items:center;gap:2px">'
-      + '<span style="font-size:1.2rem;line-height:1">&#127942;</span>'
-      + '<span style="font-family:Bebas Neue,sans-serif;font-size:.7rem;letter-spacing:1px;color:#fbbf24;line-height:1">' + v.n + '</span></div>';
+  // Combinações de clubes
+  { id:"pt-bigb", type:"pt_big3",          nome:"Jogou nos 3 grandes",            visual:{tipo:"emoji", e:"👑"} },
+  { id:"pt-rival",type:"pt_rivais",        par:["Benfica","Porto"], nome:"Jogou no Benfica E Porto", visual:{tipo:"emoji", e:"⚔️"} },
+  { id:"pt-riv2", type:"pt_rivais",        par:["Benfica","Sporting CP"], nome:"Jogou no Benfica E Sporting", visual:{tipo:"emoji", e:"🟢🔴"} },
+  { id:"pt-riv3", type:"pt_rivais",        par:["Porto","Sporting CP"], nome:"Jogou no Porto E Sporting", visual:{tipo:"emoji", e:"🔵🟢"} },
+  // Seleção
+  { id:"pt-sel",  type:"pt_selecao",       nome:"Internacional por Portugal",     visual:{tipo:"flag", pais:"Portugal"} },
+  { id:"pt-euro", type:"pt_euro2016",      nome:"Campeão Europeu 2016",           visual:{tipo:"emoji", e:"🏅"} },
+  // Posição
+  { id:"pt-gr",   type:"pt_posicao",       posicao:"Guarda-Redes", nome:"Guarda-Redes",  visual:{tipo:"emoji", e:"🧤"} },
+  { id:"pt-pe",   type:"pt_pe_esquerdo",                           nome:"Pé Esquerdo",   visual:{tipo:"emoji", e:"🦶"} },
+  // Época/Era
+  { id:"pt-90s",  type:"pt_era",           era:"90s",  nome:"Jogou nos anos 90",  visual:{tipo:"emoji", e:"📼"} },
+  { id:"pt-00s",  type:"pt_era",           era:"00s",  nome:"Jogou nos anos 2000", visual:{tipo:"emoji", e:"📀"} },
+  { id:"pt-10s",  type:"pt_era",           era:"10s",  nome:"Jogou nos anos 2010", visual:{tipo:"emoji", e:"📱"} },
+  // Estrangeiro
+  { id:"pt-estr", type:"pt_estrangeiro",   nome:"Estrangeiro na Liga PT",        visual:{tipo:"emoji", e:"🌍"} },
+  // Treinadores (na Liga PT)
+  { id:"pt-mou",  type:"pt_treinador", treinador:"Mourinho",          nome:"Treinado por Mourinho (Porto)",          visual:{tipo:"emoji", e:"😤"} },
+  { id:"pt-ao",   type:"pt_treinador", treinador:"António Oliveira",  nome:"Treinado por António Oliveira (Porto)",  visual:{tipo:"emoji", e:"🐉"} },
+  { id:"pt-jj",   type:"pt_treinador", treinador:"Jorge Jesus",       nome:"Treinado por Jorge Jesus",               visual:{tipo:"emoji", e:"✌️"} },
+  { id:"pt-mj",   type:"pt_treinador", treinador:"Manuel José",       nome:"Treinado por Manuel José (Benfica)",     visual:{tipo:"emoji", e:"🦁"} },
+  { id:"pt-jf",   type:"pt_treinador", treinador:"Jesualdo Ferreira", nome:"Treinado por Jesualdo Ferreira (Porto)", visual:{tipo:"emoji", e:"🔵"} },
+  { id:"pt-rv",   type:"pt_treinador", treinador:"Rui Vitória",       nome:"Treinado por Rui Vitória (Benfica)",     visual:{tipo:"emoji", e:"🦅"} },
+  { id:"pt-vp",   type:"pt_treinador", treinador:"Vítor Pereira",     nome:"Treinado por Vítor Pereira (Porto)",     visual:{tipo:"emoji", e:"🐏"} },
+  { id:"pt-sc",   type:"pt_treinador", treinador:"Sérgio Conceição",  nome:"Treinado por Sérgio Conceição (Porto)",  visual:{tipo:"emoji", e:"🏆"} },
+  { id:"pt-ms",   type:"pt_treinador", treinador:"Marco Silva",       nome:"Treinado por Marco Silva",               visual:{tipo:"emoji", e:"🎯"} },
+  { id:"pt-cc",   type:"pt_treinador", treinador:"Carlos Carvalhal",  nome:"Treinado por Carlos Carvalhal",          visual:{tipo:"emoji", e:"🎸"} },
+  { id:"pt-blage",type:"pt_treinador", treinador:"Bruno Lage",        nome:"Treinado por Bruno Lage (Benfica)",      visual:{tipo:"emoji", e:"⚡"} },
+  { id:"pt-rs",   type:"pt_treinador", treinador:"Roger Schmidt",     nome:"Treinado por Roger Schmidt (Benfica)",   visual:{tipo:"emoji", e:"🔬"} },
+  { id:"pt-rub",  type:"pt_treinador", treinador:"Ruben Amorim",      nome:"Treinado por Ruben Amorim (Sporting)",   visual:{tipo:"emoji", e:"🟢"} },
+  { id:"pt-rb",   type:"pt_treinador", treinador:"Rui Borges",        nome:"Treinado por Rui Borges (Sporting)",     visual:{tipo:"emoji", e:"🦊"} },
+  // ─── jogos / golos ───────────────────────────────────────────────────────
+  { id:"pt-j200", type:"pt_jogos",  min:200, nome:"200+ jogos na Liga PT",  visual:{tipo:"emoji", e:"🎮"} },
+  { id:"pt-g100", type:"pt_golos",  min:100, nome:"100+ golos na Liga PT",  visual:{tipo:"emoji", e:"💯"} },
+];
 
-  if (v.tipo === 'flag') {
-    var f = FLAGS[v.pais] || '?';
-    return '<div class="c-vis"><span class="c-flag">' + f + '</span></div>';
+// ── JOGADORES Liga PT ─────────────────────────────────────────────────────────
+const JOGADORES_PT = [
+  // ── BENFICA ──────────────────────────────────────────────────────────────
+  { nome:"Eusébio", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:11, tacas_pt_v:5, jogos_pt:313, golos_pt:320, selecao:true, eras:["60s","70s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Rui Costa", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Benfica","Sporting CP"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["90s","00s"], treinadores:["Manuel José"], pe_esquerdo:false},
+  { nome:"Nuno Gomes", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Boavista","Benfica","Braga"],
+    ligas_pt_v:2, tacas_pt_v:2, jogos_pt:275, golos_pt:205, selecao:true, eras:["90s","00s","10s"] , treinadores:["Manuel José", "Jorge Jesus"], pe_esquerdo:false},
+  { nome:"Luís Figo", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Boavista"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["90s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Deco", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Porto","Benfica","Boavista"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:true, eras:["90s","00s"] , treinadores:["Mourinho"], pe_esquerdo:false},
+  { nome:"Simão Sabrosa", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Benfica"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:true, eras:["90s","00s","10s"] , treinadores:["Jorge Jesus", "Manuel José"], pe_esquerdo:false},
+  { nome:"João Vieira Pinto", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Benfica","Sporting CP","Porto"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:true, eras:["90s","00s"] , treinadores:["Jorge Jesus", "Manuel José"], pe_esquerdo:false},
+  { nome:"Paulo Futre", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Porto","Benfica","Sporting CP"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:true, eras:["80s","90s"], treinadores:[], pe_esquerdo:true},
+  { nome:"Fernando Chalana", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:6, tacas_pt_v:3, jogos_pt:220, golos_pt:55, selecao:true, eras:["80s","90s"], treinadores:[], pe_esquerdo:true},
+  { nome:"Nélson Pereira", pais:"Portugal", posicao:"Guarda-Redes",
+    clubes_pt:["Porto","Boavista"],
+    ligas_pt_v:5, tacas_pt_v:2, selecao:true, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Vítor Baía", pais:"Portugal", posicao:"Guarda-Redes",
+    clubes_pt:["Porto"],
+    ligas_pt_v:9, tacas_pt_v:5, jogos_pt:285, golos_pt:0, selecao:true, eras:["90s","00s"] , treinadores:["António Oliveira", "Mourinho"], pe_esquerdo:false},
+  { nome:"Pedro Espinho", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Porto","Boavista"],
+    ligas_pt_v:4, tacas_pt_v:2, selecao:false, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Costinha", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Porto","Benfica"],
+    ligas_pt_v:5, tacas_pt_v:3, selecao:true, eras:["90s","00s"] , treinadores:["António Oliveira", "Mourinho"], pe_esquerdo:false},
+  { nome:"Jorge Costa", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Porto"],
+    ligas_pt_v:8, tacas_pt_v:5, jogos_pt:270, golos_pt:8, selecao:true, eras:["90s","00s"] , treinadores:["António Oliveira", "Mourinho"], pe_esquerdo:false},
+  { nome:"Fernando Couto", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Porto","Benfica","Sporting CP"],
+    ligas_pt_v:5, tacas_pt_v:3, selecao:true, eras:["90s","00s"] , treinadores:["Marco Silva"], pe_esquerdo:false},
+  { nome:"Secretário", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Porto","Boavista"],
+    ligas_pt_v:6, tacas_pt_v:3, jogos_pt:341, golos_pt:12, selecao:true, eras:["90s","00s"] , treinadores:["António Oliveira", "Mourinho"], pe_esquerdo:false},
+  { nome:"Pedro Emanuel", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Porto","Boavista","Braga"],
+    ligas_pt_v:5, tacas_pt_v:3, selecao:true, eras:["90s","00s","10s"] , treinadores:["Mourinho"], pe_esquerdo:false},
+  { nome:"Sérgio Conceição", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Porto","Benfica","Boavista"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:true, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Nuno Valente", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Porto","Sporting CP","Vitória Setúbal"],
+    ligas_pt_v:4, tacas_pt_v:2, selecao:true, eras:["90s","00s"] , treinadores:["António Oliveira", "Mourinho"], pe_esquerdo:true},
+  { nome:"Paulo Bento", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Boavista","Belenenses"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:true, eras:["90s","00s"] , treinadores:["Jorge Jesus"], pe_esquerdo:false},
+  { nome:"Figo", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["90s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Oceano", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Porto","Sporting CP"],
+    ligas_pt_v:5, tacas_pt_v:3, jogos_pt:230, golos_pt:20, selecao:true, eras:["80s","90s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Domingos Paciência", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Porto","Sporting CP","Boavista"],
+    ligas_pt_v:7, tacas_pt_v:2, jogos_pt:230, golos_pt:160, selecao:true, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Sabry", pais:"Egipto", posicao:"Avançado",
+    clubes_pt:["Benfica","Marítimo"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["00s"], treinadores:["Mourinho"], pe_esquerdo:true},
+  { nome:"Zlatko Zahović", pais:"Eslovénia", posicao:"Médio",
+    clubes_pt:["Porto","Boavista"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["90s","00s"], treinadores:[], pe_esquerdo:true},
+  { nome:"Jardel", pais:"Brasil", posicao:"Avançado",
+    clubes_pt:["Porto","Sporting CP"],
+    ligas_pt_v:4, tacas_pt_v:3, jogos_pt:186, golos_pt:189, selecao:false, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Drulović", pais:"Sérvia", posicao:"Médio",
+    clubes_pt:["Porto","Benfica"],
+    ligas_pt_v:5, tacas_pt_v:3, selecao:false, eras:["90s","00s"], treinadores:[], pe_esquerdo:true},
+  { nome:"Derlei", pais:"Brasil", posicao:"Avançado",
+    clubes_pt:["Porto"],
+    ligas_pt_v:3, tacas_pt_v:1, selecao:false, eras:["00s"] , treinadores:["António Oliveira", "Mourinho"], pe_esquerdo:false},
+  { nome:"Benni McCarthy", pais:"África do Sul", posicao:"Avançado",
+    clubes_pt:["Porto"],
+    ligas_pt_v:4, tacas_pt_v:2, selecao:false, eras:["90s","00s"] , treinadores:["António Oliveira", "Mourinho"], pe_esquerdo:false},
+  { nome:"Maniche", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Boavista","Porto"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Boa Morte", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Sporting CP","Benfica"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:true, eras:["90s"] , treinadores:["Jorge Jesus"], pe_esquerdo:true},
+  { nome:"Hélder Postiga", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Porto","Sporting CP","Belenenses","Rio Ave"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:true, eras:["00s","10s"] , treinadores:["Marco Silva"], pe_esquerdo:false},
+  { nome:"Liedson", pais:"Brasil", posicao:"Avançado",
+    clubes_pt:["Sporting CP"],
+    ligas_pt_v:2, tacas_pt_v:3, selecao:false, eras:["00s","10s"] , treinadores:["Carlos Carvalhal", "Jorge Jesus"], pe_esquerdo:false},
+  { nome:"João Moutinho", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Porto"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:true, eras:["00s","10s"], euro2016:true , treinadores:["Marco Silva", "Ruben Amorim"], pe_esquerdo:false},
+  { nome:"Miguel Veloso", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Benfica"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:true, eras:["00s","10s"], euro2016:true , treinadores:["Jorge Jesus"], pe_esquerdo:true},
+  { nome:"Ricardo Quaresma", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Sporting CP","Porto","Benfica"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:true, eras:["00s","10s"], euro2016:true , treinadores:["Carlos Carvalhal"], pe_esquerdo:false},
+  { nome:"Hugo Almeida", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Porto","Boavista"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:true, eras:["00s","10s"], treinadores:[], pe_esquerdo:true},
+  { nome:"Rolando", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Porto","Benfica","Sporting CP"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:true, eras:["00s","10s"], euro2016:true },
+  { nome:"Pepe", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Marítimo","Porto","Benfica"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["00s"], euro2016:true , treinadores:["Sérgio Conceição"], pe_esquerdo:false},
+  { nome:"Raul Meireles", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Boavista","Porto","Benfica"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:true, eras:["00s","10s"] , treinadores:["Jesualdo Ferreira"], pe_esquerdo:true},
+  { nome:"Luís Neto", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Sporting CP","Vitória Setúbal"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:true, eras:["10s"], euro2016:true },
+  { nome:"Adrien Silva", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Académica","Rio Ave"],
+    ligas_pt_v:1, tacas_pt_v:3, selecao:true, eras:["10s","20s"], euro2016:true , treinadores:["Carlos Carvalhal", "Jorge Jesus", "Ruben Amorim"], pe_esquerdo:false},
+  { nome:"William Carvalho", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Braga"],
+    ligas_pt_v:1, tacas_pt_v:3, selecao:true, eras:["10s","20s"], euro2016:true , treinadores:["Carlos Carvalhal", "Marco Silva", "Ruben Amorim"], pe_esquerdo:false},
+  { nome:"Bernardo Silva", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:1, tacas_pt_v:0, selecao:true, eras:["10s"], euro2016:true , treinadores:["Bruno Lage"], pe_esquerdo:true},
+  { nome:"Rúben Dias", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["10s","20s"] , treinadores:["Bruno Lage", "Roger Schmidt", "Rui Vitória"], pe_esquerdo:false},
+  { nome:"João Félix", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Benfica","Porto"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:true, eras:["10s","20s"] , treinadores:["Roger Schmidt"], pe_esquerdo:false},
+  { nome:"Pizzi", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Benfica","Sporting CP","Braga"],
+    ligas_pt_v:4, tacas_pt_v:4, selecao:true, eras:["10s","20s"], euro2016:true , treinadores:["Bruno Lage", "Jorge Jesus", "Roger Schmidt", "Rui Vitória"], pe_esquerdo:false},
+  { nome:"Rafa Silva", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Benfica","Braga","Sporting CP"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:true, eras:["10s","20s"], euro2016:true , treinadores:["Bruno Lage", "Jorge Jesus", "Roger Schmidt", "Rui Vitória"], pe_esquerdo:false},
+  { nome:"Grimaldo", pais:"Espanha", posicao:"Defesa",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:false, eras:["10s","20s"] , treinadores:["Bruno Lage", "Jorge Jesus", "Roger Schmidt", "Rui Vitória"], pe_esquerdo:true},
+  { nome:"Vlachodimos", pais:"Grécia", posicao:"Guarda-Redes",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["10s","20s"] , treinadores:["Bruno Lage", "Jorge Jesus", "Roger Schmidt", "Rui Vitória"], pe_esquerdo:false},
+  { nome:"Otamendi", pais:"Argentina", posicao:"Defesa",
+    clubes_pt:["Porto","Benfica"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["10s","20s"] , treinadores:["Jesualdo Ferreira", "Roger Schmidt", "Sérgio Conceição"], pe_esquerdo:false},
+  { nome:"Enzo Fernández", pais:"Argentina", posicao:"Médio",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:1, tacas_pt_v:0, selecao:false, eras:["20s"] , treinadores:["Roger Schmidt"], pe_esquerdo:false},
+  { nome:"Darwin Núñez", pais:"Uruguai", posicao:"Avançado",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["20s"] , treinadores:["Jorge Jesus", "Roger Schmidt"], pe_esquerdo:false},
+  { nome:"Haris Seferović", pais:"Suíça", posicao:"Avançado",
+    clubes_pt:["Benfica","Braga"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["10s","20s"] , treinadores:["Bruno Lage", "Jorge Jesus", "Roger Schmidt", "Rui Vitória"], pe_esquerdo:true},
+  { nome:"Franco Cervi", pais:"Argentina", posicao:"Médio",
+    clubes_pt:["Benfica","Braga"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["10s","20s"] , treinadores:["Bruno Lage", "Jorge Jesus", "Rui Vitória"], pe_esquerdo:true},
+  { nome:"Helton", pais:"Brasil", posicao:"Guarda-Redes",
+    clubes_pt:["Porto"],
+    ligas_pt_v:5, tacas_pt_v:3, selecao:false, eras:["00s","10s"] , treinadores:["António Oliveira", "Jesualdo Ferreira"], pe_esquerdo:false},
+  { nome:"Lisandro López", pais:"Argentina", posicao:"Avançado",
+    clubes_pt:["Porto"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["00s","10s"], treinadores:["Jesualdo Ferreira"], pe_esquerdo:false},
+  { nome:"Falcao", pais:"Colômbia", posicao:"Avançado",
+    clubes_pt:["Porto"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:false, eras:["10s"] , treinadores:["Mourinho"], pe_esquerdo:false},
+  { nome:"Hulk", pais:"Brasil", posicao:"Avançado",
+    clubes_pt:["Porto"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["00s","10s"], treinadores:["Jesualdo Ferreira", "Vítor Pereira"], pe_esquerdo:true},
+  { nome:"James Rodríguez", pais:"Colômbia", posicao:"Médio",
+    clubes_pt:["Porto"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["10s"], treinadores:["Vítor Pereira"], pe_esquerdo:true},
+  { nome:"Danilo Pereira", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Porto","Marítimo","Belenenses"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:true, eras:["10s","20s"], euro2016:true, treinadores:["Jesualdo Ferreira", "Sérgio Conceição", "Vítor Pereira"], pe_esquerdo:false},
+  { nome:"Casillas", pais:"Espanha", posicao:"Guarda-Redes",
+    clubes_pt:["Porto"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:false, eras:["10s"], treinadores:["Sérgio Conceição"], pe_esquerdo:true},
+  { nome:"Brahimi", pais:"Argélia", posicao:"Médio",
+    clubes_pt:["Porto"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:false, eras:["10s","20s"], treinadores:["Carlos Carvalhal", "Sérgio Conceição"], pe_esquerdo:false},
+  { nome:"Marega", pais:"Mali", posicao:"Avançado",
+    clubes_pt:["Porto","Boavista","Marítimo","Vitória Guimarães"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["10s","20s"], treinadores:["Sérgio Conceição", "Vítor Pereira"], pe_esquerdo:false},
+  { nome:"Alex Telles", pais:"Brasil", posicao:"Defesa",
+    clubes_pt:["Porto"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:false, eras:["10s","20s"] , treinadores:["Roger Schmidt", "Sérgio Conceição", "Vítor Pereira"], pe_esquerdo:true},
+  { nome:"Acuña", pais:"Argentina", posicao:"Defesa",
+    clubes_pt:["Sporting CP"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:false, eras:["10s","20s"] , treinadores:["Ruben Amorim"], pe_esquerdo:true},
+  { nome:"Paulinho", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Sporting CP","Braga"],
+    ligas_pt_v:1, tacas_pt_v:3, selecao:true, eras:["10s","20s"] , treinadores:["Carlos Carvalhal", "Marco Silva", "Ruben Amorim", "Rui Borges"], pe_esquerdo:true},
+  { nome:"Nuno Santos", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Vitória Guimarães","Rio Ave"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:true, eras:["10s","20s"] , treinadores:["Ruben Amorim", "Rui Borges"], pe_esquerdo:true},
+  { nome:"Sebastian Coates", pais:"Uruguai", posicao:"Defesa",
+    clubes_pt:["Sporting CP"],
+    ligas_pt_v:1, tacas_pt_v:3, selecao:false, eras:["10s","20s"] , treinadores:["Ruben Amorim", "Rui Borges"], pe_esquerdo:false},
+  { nome:"Palhinha", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Braga"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:true, eras:["10s","20s"] , treinadores:["Ruben Amorim"], pe_esquerdo:false},
+  { nome:"Pedro Gonçalves", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Famalicão","Paços Ferreira"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:true, eras:["20s"] , treinadores:["Ruben Amorim", "Rui Borges"], pe_esquerdo:false},
+  { nome:"Carlos Queiroz", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Sporting CP","Vitória Setúbal"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:true, eras:["80s"], treinadores:[], pe_esquerdo:false},
+
+  { nome:"Nuno Espírito Santo", pais:"Portugal", posicao:"Guarda-Redes",
+    clubes_pt:["Vitória Guimarães","Porto","Sporting CP","Boavista"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:true, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Sá Pinto", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Benfica","Sporting CP","Boavista"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:true, eras:["90s","00s"] , treinadores:["Jorge Jesus"], pe_esquerdo:false},
+  { nome:"Freddy Adu", pais:"Estados Unidos", posicao:"Médio",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Fernando Meira", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Sporting CP","Benfica","Vitória Guimarães"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Litos", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Boavista","Braga"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:true, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Petit", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Benfica","Boavista","Belenenses","Sporting CP"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:true, eras:["90s","00s","10s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Nuno Assis", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Porto","Sporting CP","Nacional"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:true, eras:["90s","00s","10s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Jankauskas", pais:"Lituânia", posicao:"Avançado",
+    clubes_pt:["Porto","Benfica","Belenenses"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:false, eras:["00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Ibson", pais:"Brasil", posicao:"Médio",
+    clubes_pt:["Porto"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Tarik", pais:"Marrocos", posicao:"Avançado",
+    clubes_pt:["Porto","Marítimo"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["00s"], treinadores:["Jesualdo"], pe_esquerdo:false},
+  { nome:"Hélder", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Benfica","Porto"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:true, eras:["90s","00s"], treinadores:["Mourinho"], pe_esquerdo:false},
+  { nome:"Edmilson", pais:"Brasil", posicao:"Médio",
+    clubes_pt:["Porto"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:false, eras:["00s"], treinadores:[], pe_esquerdo:true},
+  { nome:"Diego", pais:"Brasil", posicao:"Médio",
+    clubes_pt:["Porto"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Quaresma", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Sporting CP","Porto","Benfica"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:true, eras:["00s","10s"], euro2016:true , treinadores:["Carlos Carvalhal"], pe_esquerdo:false},
+  { nome:"Tibi", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Benfica","Porto"],
+    ligas_pt_v:5, tacas_pt_v:3, selecao:false, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Evandro", pais:"Brasil", posicao:"Médio",
+    clubes_pt:["Porto"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["10s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Xavier", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Boavista","Sporting CP"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Paulo Sérgio", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Benfica","Porto","Sporting CP","Braga"],
+    ligas_pt_v:5, tacas_pt_v:4, selecao:true, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Rui Patrício", pais:"Portugal", posicao:"Guarda-Redes",
+    clubes_pt:["Sporting CP"],
+    ligas_pt_v:1, tacas_pt_v:3, selecao:true, eras:["00s","10s"], euro2016:true , treinadores:["Ruben Amorim"], pe_esquerdo:true},
+  { nome:"Lima", pais:"Brasil", posicao:"Avançado",
+    clubes_pt:["Benfica","Braga"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:false, eras:["10s"] , treinadores:["Jorge Jesus", "Rui Vitória"], pe_esquerdo:false},
+  { nome:"Luisão", pais:"Brasil", posicao:"Defesa",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:6, tacas_pt_v:4, jogos_pt:345, golos_pt:22, selecao:false, eras:["00s","10s"] , treinadores:["Jorge Jesus", "Manuel José", "Rui Vitória"], pe_esquerdo:false},
+  { nome:"Nélson Semedo", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:true, eras:["10s"], euro2016:true , treinadores:["Bruno Lage", "Jorge Jesus", "Rui Vitória"], pe_esquerdo:false},
+  { nome:"André Almeida", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Benfica","Vitória Setúbal"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:true, eras:["10s","20s"] , treinadores:["Bruno Lage", "Jorge Jesus", "Roger Schmidt", "Rui Vitória"], pe_esquerdo:false},
+  { nome:"Talisca", pais:"Brasil", posicao:"Médio",
+    clubes_pt:["Benfica"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["10s"] , treinadores:["Bruno Lage", "Jorge Jesus", "Rui Vitória"], pe_esquerdo:true},
+  { nome:"Gudijonsson", pais:"Islândia", posicao:"Médio",
+    clubes_pt:["Belenenses"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["90s","00s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Neca", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Boavista","Porto","Vitória Guimarães"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:false, eras:["90s","00s"], treinadores:["Mourinho"], pe_esquerdo:false},
+  { nome:"Vítor Paneira", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Sporting CP","Benfica"],
+    ligas_pt_v:2, tacas_pt_v:3, selecao:true, eras:["80s","90s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Mário Wilson", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Benfica","Sporting CP","Belenenses"],
+    ligas_pt_v:5, tacas_pt_v:4, selecao:true, eras:["60s","70s"], treinadores:[], pe_esquerdo:false},
+  { nome:"Yazalde", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Sporting CP","Boavista"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["70s","80s"], treinadores:[], pe_esquerdo:true},
+  { nome:"Shoya Nakajima", pais:"Japão", posicao:"Médio",
+    clubes_pt:["Porto","Portimonense","Paços Ferreira"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["10s","20s"], treinadores:["Sérgio Conceição"], pe_esquerdo:false},
+  { nome:"Gonçalo Inácio", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Sporting CP"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:true, eras:["20s"] , treinadores:["Ruben Amorim", "Rui Borges"], pe_esquerdo:true},
+  { nome:"Gyökeres", pais:"Suécia", posicao:"Avançado",
+    clubes_pt:["Sporting CP"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["20s"] , treinadores:["Ruben Amorim", "Rui Borges"], pe_esquerdo:false},
+
+
+  // ── FIXES ──────────────────────────────────────────────────────────────────
+  // (Manchiche corrected to Maniche below, Conrad Colmán removed)
+
+  // ── MARÍTIMO ───────────────────────────────────────────────────────────────
+  { nome:"Edgar Costa", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Marítimo","Braga","Vitória Guimarães"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["00s","10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Rui Fonte", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Marítimo","Braga","Sporting CP"],
+    ligas_pt_v:0, tacas_pt_v:1, selecao:true, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"João Carlos Teixeira", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Marítimo","Braga","Vitória Guimarães"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Dyego Sousa", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Marítimo","Braga","Famalicão","Moreirense"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Babanco", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Marítimo","Nacional"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["90s","00s","10s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Rui Barreto", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Marítimo","Nacional"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["90s","00s","10s"], treinadores:[], pe_esquerdo:false },
+
+
+  // ── ACADÉMICA ──────────────────────────────────────────────────────────────
+  { nome:"Nené", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Benfica","Académica","Boavista"],
+    ligas_pt_v:7, tacas_pt_v:5, selecao:true, eras:["70s","80s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Mário Coluna", pais:"Moçambique", posicao:"Médio",
+    clubes_pt:["Benfica","Académica"],
+    ligas_pt_v:10, tacas_pt_v:6, jogos_pt:280, golos_pt:60, selecao:true, eras:["60s","70s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Zé Castro", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Académica","Vitória Guimarães","Sporting CP"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:true, eras:["00s","10s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Bruno Nascimento", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Académica","Vitória Guimarães","Braga"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["00s","10s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Quim", pais:"Portugal", posicao:"Guarda-Redes",
+    clubes_pt:["Académica","Braga","Benfica"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["90s","00s","10s"], treinadores:["Jorge Jesus","Rui Vitória"], pe_esquerdo:false },
+
+  // ── NACIONAL ───────────────────────────────────────────────────────────────
+  { nome:"Cláudio Ramos", pais:"Portugal", posicao:"Guarda-Redes",
+    clubes_pt:["Nacional","Porto","Tondela"],
+    ligas_pt_v:1, tacas_pt_v:0, selecao:true, eras:["10s","20s"], treinadores:["Sérgio Conceição"], pe_esquerdo:false },
+  { nome:"Nenê", pais:"Brasil", posicao:"Médio",
+    clubes_pt:["Nacional","Moreirense"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:["Jesualdo Ferreira"], pe_esquerdo:false },
+  { nome:"Helder Guedes", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Nacional","Boavista","Académica"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["00s","10s"], treinadores:[], pe_esquerdo:false },
+
+  // ── VITÓRIA SETÚBAL ────────────────────────────────────────────────────────
+  { nome:"Mateus", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Vitória Setúbal","Benfica","Boavista"],
+    ligas_pt_v:3, tacas_pt_v:3, selecao:true, eras:["70s","80s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Venâncio", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Vitória Setúbal","Sporting CP"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:true, eras:["70s","80s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Sadio Diallo", pais:"Guiné-Bissau", posicao:"Avançado",
+    clubes_pt:["Vitória Setúbal","Marítimo","Académica"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["00s","10s"], treinadores:[], pe_esquerdo:false },
+
+  // ── BOAVISTA ───────────────────────────────────────────────────────────────
+  { nome:"Elpídio Silva", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Boavista","Porto"],
+    ligas_pt_v:3, tacas_pt_v:2, selecao:true, eras:["80s","90s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Rui Jordão", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Boavista","Benfica","Sporting CP"],
+    ligas_pt_v:5, tacas_pt_v:4, selecao:true, eras:["70s","80s","90s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Erwin Sánchez", pais:"Bolívia", posicao:"Médio",
+    clubes_pt:["Benfica","Boavista"],
+    ligas_pt_v:1, tacas_pt_v:1, selecao:false, eras:["90s","00s"], treinadores:[], pe_esquerdo:false },
+
+  // ── BRAGA ──────────────────────────────────────────────────────────────────
+  { nome:"Ricardo Horta", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Braga","Marítimo","Sporting CP"],
+    ligas_pt_v:0, tacas_pt_v:2, selecao:true, eras:["10s","20s"], treinadores:["Carlos Carvalhal"], pe_esquerdo:false },
+  { nome:"Abel Ferreira", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Braga","Sporting CP","Vitória Guimarães"],
+    ligas_pt_v:0, tacas_pt_v:1, selecao:false, eras:["90s","00s","10s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Alan", pais:"Brasil", posicao:"Avançado",
+    clubes_pt:["Marítimo","Vitória Guimarães","Braga","Porto"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+
+  // ── VITÓRIA GUIMARÃES ──────────────────────────────────────────────────────
+  { nome:"Tozé", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Vitória Guimarães","Sporting CP","Boavista"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:true, eras:["90s","00s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Luís Olim", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Vitória Guimarães","Benfica","Boavista"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:true, eras:["80s","90s","00s"], treinadores:[], pe_esquerdo:true },
+  { nome:"Tomané", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Vitória Guimarães","Boavista","Sporting CP"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Davidson", pais:"Brasil", posicao:"Defesa",
+    clubes_pt:["Vitória Guimarães","Nacional"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["00s","10s"], treinadores:["Rui Borges"], pe_esquerdo:false },
+  { nome:"Marcus Edwards", pais:"Inglaterra", posicao:"Médio",
+    clubes_pt:["Vitória Guimarães","Sporting CP"],
+    ligas_pt_v:1, tacas_pt_v:2, selecao:false, eras:["20s"], treinadores:["Ruben Amorim","Rui Borges"], pe_esquerdo:true },
+
+  // ── BELENENSES ─────────────────────────────────────────────────────────────
+  { nome:"Matateu", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Belenenses","Benfica"],
+    ligas_pt_v:4, tacas_pt_v:3, selecao:true, eras:["50s","60s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Shéu Han", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Belenenses","Benfica","Porto"],
+    ligas_pt_v:6, tacas_pt_v:4, selecao:true, eras:["70s","80s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Frechaut", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Belenenses","Sporting CP"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:true, eras:["70s","80s"], treinadores:[], pe_esquerdo:false },
+
+  // ── PAÇOS FERREIRA ─────────────────────────────────────────────────────────
+  { nome:"Ronan", pais:"Brasil", posicao:"Avançado",
+    clubes_pt:["Rio Ave","Tondela"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Matchoi Djalo", pais:"Guiné-Bissau", posicao:"Avançado",
+    clubes_pt:["Paços Ferreira"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+
+  // ── RIO AVE ────────────────────────────────────────────────────────────────
+  { nome:"Pelé", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Rio Ave","Vitória Guimarães","Boavista"],
+    ligas_pt_v:0, tacas_pt_v:1, selecao:true, eras:["00s","10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Tarantini", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Boavista","Benfica","Rio Ave"],
+    ligas_pt_v:2, tacas_pt_v:2, selecao:false, eras:["90s","00s","10s"], treinadores:[], pe_esquerdo:false },
+
+  // ── FAMALICÃO ──────────────────────────────────────────────────────────────
+  { nome:"Ivo Pinto", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Famalicão","Nacional","Rio Ave"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Gustavo Assunção", pais:"Brasil", posicao:"Médio",
+    clubes_pt:["Famalicão","Braga","Boavista"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+
+  // ── GIL VICENTE ────────────────────────────────────────────────────────────
+  { nome:"Fran Navarro", pais:"Espanha", posicao:"Avançado",
+    clubes_pt:["Gil Vicente","Porto","Braga"],
+    ligas_pt_v:0, tacas_pt_v:1, selecao:false, eras:["20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Lourency", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Gil Vicente","Moreirense"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["20s"], treinadores:[], pe_esquerdo:false },
+
+  // ── MOREIRENSE ─────────────────────────────────────────────────────────────
+  { nome:"Fábio Abreu", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Moreirense","Nacional","Académica","Vitória Setúbal"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+
+  // ── SETÚBAL histórico ──────────────────────────────────────────────────────
+  { nome:"Jacinto João", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Vitória Setúbal","Sporting CP"],
+    ligas_pt_v:2, tacas_pt_v:3, selecao:true, eras:["60s","70s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Octávio Machado", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Vitória Setúbal","Porto"],
+    ligas_pt_v:2, tacas_pt_v:1, selecao:true, eras:["70s","80s"], treinadores:[], pe_esquerdo:false },
+
+  // ── TONDELA / AROUCA / ESTORIL ─────────────────────────────────────────────
+  { nome:"Salvador Agra", pais:"Portugal", posicao:"Avançado",
+    clubes_pt:["Arouca","Boavista","Nacional","Académica"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Zequinha", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Estoril","Vitória Guimarães","Boavista"],
+    ligas_pt_v:0, tacas_pt_v:1, selecao:false, eras:["00s","10s"], treinadores:[], pe_esquerdo:false },
+
+
+  // ── AROUCA ─────────────────────────────────────────────────────────────────
+  { nome:"David Simão", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Arouca","Nacional","Vitória Guimarães"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:true },
+  { nome:"Antunes", pais:"Portugal", posicao:"Defesa",
+    clubes_pt:["Sporting CP","Arouca","Vitória Guimarães","Moreirense"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:true, eras:["10s","20s"], treinadores:["Ruben Amorim"], pe_esquerdo:true },
+
+  // ── ESTORIL ────────────────────────────────────────────────────────────────
+  { nome:"Diogo Amado", pais:"Portugal", posicao:"Médio",
+    clubes_pt:["Estoril","Boavista","Rio Ave"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s","20s"], treinadores:[], pe_esquerdo:false },
+  { nome:"Anderson Luis", pais:"Brasil", posicao:"Avançado",
+    clubes_pt:["Estoril","Nacional","Marítimo"],
+    ligas_pt_v:0, tacas_pt_v:0, selecao:false, eras:["10s"], treinadores:[], pe_esquerdo:false },
+
+];
+
+// ── checkCat para Liga PT ─────────────────────────────────────────────────────
+function checkCatPT(cat, j) {
+  switch(cat.type) {
+    case 'pt_clube':
+      return j.clubes_pt.includes(cat.clube);
+    case 'pt_liga_vencedor':
+      return j.ligas_pt_v >= cat.vezes;
+    case 'pt_taca':
+      return j.tacas_pt_v >= cat.vezes;
+    case 'pt_big3':
+      return j.clubes_pt.includes('Benfica') && j.clubes_pt.includes('Porto') && j.clubes_pt.includes('Sporting CP');
+    case 'pt_rivais':
+      return j.clubes_pt.includes(cat.par[0]) && j.clubes_pt.includes(cat.par[1]);
+    case 'pt_selecao':
+      return j.selecao === true;
+    case 'pt_euro2016':
+      return j.euro2016 === true;
+    case 'pt_posicao':
+      return j.posicao === cat.posicao;
+    case 'pt_era':
+      return j.eras.includes(cat.era);
+    case 'pt_estrangeiro':
+      return j.pais !== 'Portugal';
+    case 'pt_pe_esquerdo':
+      return j.pe_esquerdo === true;
+    case 'pt_treinador':
+      return Array.isArray(j.treinadores) && j.treinadores.includes(cat.treinador);
+    case 'pt_jogos':
+      return typeof j.jogos_pt !== 'undefined' && j.jogos_pt >= cat.min;
+    case 'pt_golos':
+      return typeof j.golos_pt !== 'undefined' && j.golos_pt >= cat.min;
+    default:
+      return false;
   }
-
-  if (v.tipo === 'mundial')
-    return '<div class="c-vis"><span style="font-size:1.8rem">&#127942;</span></div>';
-
-  if (v.tipo === 'liga') {
-    var d = LEAGUE_BADGES[v.liga];
-    if (!d) return '<div class="c-vis"><span class="c-emoji">🏅</span></div>';
-    if (typeof d === 'string') return '<div class="c-vis"><img src="' + d + '" style="width:36px;height:36px;object-fit:contain"></div>';
-    return '<div class="c-vis">' + makeBadge(d, 36, 7) + '</div>';
-  }
-
-  if (v.tipo === 'trofeu_liga') {
-    var d2 = LEAGUE_BADGES[v.liga];
-    var ligaHtml = '';
-    if (d2 && typeof d2 === 'string') ligaHtml = '<img src="' + d2 + '" style="width:22px;height:22px;object-fit:contain">';
-    else if (d2) ligaHtml = makeBadge(d2, 22, 4);
-    return '<div class="c-vis" style="display:flex;flex-direction:column;align-items:center;gap:2px">'
-      + '<span style="font-size:1rem;line-height:1">&#127942;</span>'
-      + ligaHtml + '</div>';
-  }
-
-  if (v.tipo === 'ucl') {
-    var d3 = LEAGUE_BADGES['Liga dos Campeões'];
-    if (!d3) return '<div class="c-vis"><span class="c-emoji">⭐</span></div>';
-    if (typeof d3 === 'string') return '<div class="c-vis"><img src="' + d3 + '" style="width:36px;height:36px;object-fit:contain"></div>';
-    return '<div class="c-vis">' + makeBadge(d3, 36, 7) + '</div>';
-  }
-
-  if (v.tipo === 'clube') {
-    var d4 = CLUB_LOGOS[v.clube];
-    if (!d4) return '<div class="c-vis club-init">' + v.clube.charAt(0) + '</div>';
-    if (typeof d4 === 'string') return '<div class="c-vis"><img src="' + d4 + '" style="width:34px;height:34px;object-fit:contain"></div>';
-    return '<div class="c-vis">' + makeBadge(d4, 34, 6) + '</div>';
-  }
-
-  return '<div class="c-vis"><span class="c-emoji">?</span></div>';
 }
-
-function shuffle(a) { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; }
 
 let state = {};
 let usarTimer = false;
@@ -1237,8 +1801,17 @@ function makeBadge(d, w, r) {
 function visualHTML(v) {
   if (!v) return '<div class="c-vis"><span class="c-emoji">?</span></div>';
 
-  if (v.tipo === 'emoji')
+  if (v.tipo === 'emoji') {
+    // Split emoji string into individual grapheme clusters for correct side-by-side display
+    const emojis = [...v.e];
+    if (emojis.length > 1) {
+      const inner = emojis.map(function(ch) {
+        return '<span style="font-size:1.1rem;line-height:1">' + ch + '</span>';
+      }).join('');
+      return '<div class="c-vis"><div style="display:flex;align-items:center;justify-content:center;gap:1px">' + inner + '</div></div>';
+    }
     return '<div class="c-vis"><span class="c-emoji">' + v.e + '</span></div>';
+  }
 
   if (v.tipo === 'ucl_multi')
     return '<div class="c-vis" style="display:flex;flex-direction:column;align-items:center;gap:2px">'
@@ -1284,6 +1857,10 @@ function visualHTML(v) {
     return '<div class="c-vis">' + makeBadge(d4, 34, 6) + '</div>';
   }
 
+  if (v.tipo === 'pt_clube') {
+    return '<div class="c-vis">' + makeLigaPTBadge(v.clube, 34) + '</div>';
+  }
+
   return '<div class="c-vis"><span class="c-emoji">?</span></div>';
 }
 
@@ -1300,6 +1877,7 @@ function shuffle(a) {
 // ─── SCREENS ─────────────────────────────────────────────────────────────────
 function startGame(comTimer) {
   isDaily = false;
+  isLigaPT = false;
   usarTimer = comTimer;
   document.getElementById('screen-choose').classList.add('hidden');
   document.getElementById('screen-game').classList.remove('hidden');
@@ -1311,7 +1889,9 @@ function voltarEscolha() {
   stopTimer();
   closeModal();
   isDaily = false;
+  isLigaPT = false;
   document.getElementById('daily-game-banner').style.display = 'none';
+  document.getElementById('g-title-text').textContent = '⚽ Bingo de Futebol';
   document.getElementById('screen-game').classList.add('hidden');
   document.getElementById('screen-choose').classList.remove('hidden');
   initChooseScreen();
@@ -1319,11 +1899,13 @@ function voltarEscolha() {
 
 function newGame() {
   stopTimer();
+  document.getElementById('g-title-text').textContent = '⚽ Bingo de Futebol';
   state = {
     cartela:  shuffle(CATEGORIAS).slice(0, 16),
     fila:     shuffle(JOGADORES),
     idx:      0,
     marcados: {},
+    dailyAttempts: [],
     ativo:    true,
     done:     false
   };
@@ -1350,6 +1932,11 @@ function renderGrid() {
       d.innerHTML = visualHTML(cat.visual)
         + '<div class="c-text">' + cat.nome + '</div>'
         + '<div class="c-sub">'  + m.nome   + '</div>';
+    } else if (m === false) {
+      d.classList.add('wrong-perm');
+      d.innerHTML = visualHTML(cat.visual)
+        + '<div class="c-text">' + cat.nome + '</div>'
+        + '<div class="c-sub">Falhado</div>';
     } else {
       d.innerHTML = visualHTML(cat.visual)
         + '<div class="c-text">' + cat.nome + '</div>';
@@ -1378,7 +1965,7 @@ function pick(i) {
   const cat = state.cartela[i];
   const cell = document.getElementById('c' + i);
 
-  if (checkCat(cat, j)) {
+  if ((isLigaPT ? checkCatPT : checkCat)(cat, j)) {
     // ── CORRECT ──────────────────────────────────────────────────────────────
     stopTimer();
     state.marcados[i] = { nome: j.nome };
@@ -1391,7 +1978,8 @@ function pick(i) {
     updateScore();
 
     if (isDaily) {
-      saveDailyState(state.idx + 1, state.marcados, false);
+      state.dailyAttempts.push('hit');
+      saveDailyState(state.idx + 1, state.marcados, state.done, state.dailyAttempts);
       renderDailyDots();
     }
 
@@ -1403,7 +1991,7 @@ function pick(i) {
       state.idx++;
       document.getElementById('btn-next').disabled = true;
       if (isDaily) {
-        saveDailyState(state.idx, state.marcados, true);
+        saveDailyState(state.idx, state.marcados, true, state.dailyAttempts);
         showDailyShare();
       }
       setTimeout(() => showEndModal(true), 700);
@@ -1415,16 +2003,19 @@ function pick(i) {
   } else {
     // ── WRONG ────────────────────────────────────────────────────────────────
     state.ativo = false;
+    state.marcados[i] = false;
     cell.classList.add('wrong');
     toast('❌ Errado! A passar ao próximo...', 'err');
     stopTimer();
 
     setTimeout(() => {
       cell.classList.remove('wrong');
+      cell.classList.add('wrong-perm');
       state.ativo = true;
       state.idx++;
       if (isDaily) {
-        saveDailyState(state.idx, state.marcados, false);
+        state.dailyAttempts.push('miss');
+        saveDailyState(state.idx, state.marcados, state.done, state.dailyAttempts);
         renderDailyDots();
       }
       renderPlayer();
@@ -1438,7 +2029,8 @@ function nextPlayer() {
   stopTimer();
   state.idx++;
   if (isDaily) {
-    saveDailyState(state.idx, state.marcados, false);
+    state.dailyAttempts.push('skip');
+    saveDailyState(state.idx, state.marcados, state.done, state.dailyAttempts);
     renderDailyDots();
   }
   renderPlayer();
@@ -1466,13 +2058,20 @@ function updateScore() {
 function showEndModal(bingo) {
   const hits  = Object.values(state.marcados).filter(v => v && v.nome).length;
   const modal = document.getElementById('modal');
-  const title = document.getElementById('modal-title');
-  const msg   = document.getElementById('modal-msg');
+  const icon  = document.getElementById('mi');
+  const title = document.getElementById('mt');
+  const msg   = document.getElementById('md');
+  const sm    = document.getElementById('ms-m');
+  const sj    = document.getElementById('ms-j');
   if (!modal) return;
+  if (sm) sm.textContent = String(hits);
+  if (sj) sj.textContent = String(Math.min(state.idx, state.fila.length));
   if (bingo) {
+    if (icon) icon.textContent = '🏆';
     title.textContent = '🎉 BINGO!';
-    msg.textContent   = 'Completaste a cartela com ' + state.idx + ' jogadores!';
+    msg.textContent   = 'Completaste a cartela com ' + Math.min(state.idx, state.fila.length) + ' jogadores.';
   } else {
+    if (icon) icon.textContent = '📊';
     title.textContent = 'Jogo terminado';
     msg.textContent   = hits + ' de 16 categorias preenchidas.';
   }
@@ -1489,6 +2088,7 @@ function startTimer() {
   stopTimer();
   if (!usarTimer) return;
   timerEnd = Date.now() + 10000;
+  timerSec = 10;
   updateTimerUI();
   timerIv = setInterval(() => {
     const rem = Math.ceil((timerEnd - Date.now()) / 1000);
@@ -1504,8 +2104,8 @@ function stopTimer() {
 }
 
 function updateTimerUI() {
-  const bar = document.getElementById('timer-bar');
-  const lbl = document.getElementById('timer-lbl');
+  const bar = document.getElementById('tfill');
+  const lbl = document.getElementById('tnum');
   if (bar) bar.style.width = (timerSec / 10 * 100) + '%';
   if (lbl) lbl.textContent = timerSec + 's';
 }
@@ -1519,6 +2119,56 @@ function toast(msg, cls) {
   clearTimeout(toastT);
   toastT = setTimeout(() => t.classList.remove('show'), 2000);
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LIGA PORTUGUESA — lógica de jogo
+// ═══════════════════════════════════════════════════════════════════════════
+
+let isLigaPT = false;
+
+function startLigaPT(comTimer) {
+  isLigaPT  = true;
+  isDaily   = false;
+  usarTimer = comTimer;
+
+  const cartela = shuffle(CATEGORIAS_PT).slice(0, 16);
+  const fila    = getLigaPTFila(cartela);
+
+  state = { cartela, fila, idx: 0, marcados: {}, dailyAttempts: [], ativo: true, done: false };
+
+  document.getElementById('screen-choose').classList.add('hidden');
+  document.getElementById('screen-game').classList.remove('hidden');
+  document.getElementById('daily-game-banner').style.display = 'none';
+  document.getElementById('timer-row').style.display = comTimer ? 'flex' : 'none';
+  document.getElementById('g-title-text').textContent = '\uD83C\uDDF5\uD83C\uDDF9 Liga Portuguesa';
+
+  const shareArea = document.getElementById('daily-share-area');
+  if (shareArea) shareArea.remove();
+
+  renderGrid();
+  renderPlayer();
+  updateScore();
+}
+
+function getLigaPTFila(cartela) {
+  const seed = Math.floor(Date.now() / 60000); // changes per minute, random per game
+  const all  = seededShuffle(JOGADORES_PT, seed);
+  const selected = new Set();
+  // Pass 1: guarantee >=2 players per category
+  for (let ci = 0; ci < cartela.length; ci++) {
+    const cat = cartela[ci];
+    let found = 0;
+    for (let pi = 0; pi < all.length && found < 2; pi++) {
+      if (checkCatPT(cat, all[pi])) { selected.add(pi); found++; }
+    }
+  }
+  // Pass 2: fill to 40
+  for (let pi = 0; pi < all.length && selected.size < 40; pi++) selected.add(pi);
+  // Pass 3: shuffle final pool
+  return seededShuffle([...selected].map(i => all[i]), seed ^ 0xdeadbeef);
+}
+
 
 
 function getDailyKey() {
@@ -1548,19 +2198,16 @@ function getDailyCartela() {
 }
 
 function getDailyFila() {
-  const seed    = dailySeed(getDailyKey() + '_fila');
-  const cartela = getDailyCartela();
-  const TARGET  = 40;
+  const seed       = dailySeed(getDailyKey() + '_fila');
+  const cartela    = getDailyCartela();
+  const TARGET     = 40;
   const MIN_PER_CAT = 2;
 
-  // Seeded shuffle of all players
+  // Seeded shuffle of the full player list
   const all = seededShuffle(JOGADORES, seed);
 
-  // Build pool: ensure each category has at least MIN_PER_CAT players
+  // Pass 1: guarantee MIN_PER_CAT players per category
   const selected = new Set();
-  const catHits  = new Array(16).fill(0);
-
-  // Pass 1: for each category, pick first MIN_PER_CAT matching players from shuffled list
   for (let ci = 0; ci < 16; ci++) {
     const cat = cartela[ci];
     let found = 0;
@@ -1568,18 +2215,19 @@ function getDailyFila() {
       if (checkCat(cat, all[pi])) {
         selected.add(pi);
         found++;
-        catHits[ci] = found;
       }
     }
   }
 
-  // Pass 2: fill remaining slots up to TARGET from shuffled order
+  // Pass 2: fill remaining slots up to TARGET from the seeded-shuffle order
   for (let pi = 0; pi < all.length && selected.size < TARGET; pi++) {
     selected.add(pi);
   }
 
-  // Return players in original seeded-shuffle order (deterministic)
-  return [...selected].sort((a,b) => a-b).map(i => all[i]);
+  // Pass 3: shuffle the final 40 with a different seed so coverage players
+  // are not always first — order is fully random but still deterministic
+  const pool = [...selected].map(i => all[i]);
+  return seededShuffle(pool, dailySeed(getDailyKey() + '_order'));
 }
 
 function loadDailyState() {
@@ -1602,12 +2250,13 @@ function loadDailyState() {
   } catch(e) { return null; }
 }
 
-function saveDailyState(idx, marcados, done) {
+function saveDailyState(idx, marcados, done, attempts) {
   try {
     const mc = Object.values(marcados).filter(v => v && v.nome).length;
     localStorage.setItem('daily_' + getDailyKey(), JSON.stringify({
       idx: idx,
       marcados: marcados,
+      attempts: Array.isArray(attempts) ? attempts : (state.dailyAttempts || []),
       done: done,
       marcados_count: mc
     }));
@@ -1659,11 +2308,11 @@ function startDailyGame() {
   const fila    = getDailyFila();
 
   if (saved && saved.done) {
-    state = { cartela, fila, idx: saved.idx, marcados: saved.marcados, ativo: false, done: true };
+    state = { cartela, fila, idx: saved.idx, marcados: saved.marcados, dailyAttempts: saved.attempts || [], ativo: false, done: true };
   } else if (saved && !saved.done) {
-    state = { cartela, fila, idx: saved.idx, marcados: saved.marcados, ativo: true,  done: false };
+    state = { cartela, fila, idx: saved.idx, marcados: saved.marcados, dailyAttempts: saved.attempts || [], ativo: true,  done: false };
   } else {
-    state = { cartela, fila, idx: 0, marcados: {}, ativo: true, done: false };
+    state = { cartela, fila, idx: 0, marcados: {}, dailyAttempts: [], ativo: true, done: false };
     updateStreak();
   }
 
@@ -1681,7 +2330,12 @@ function startDailyGame() {
   }
 
   renderGrid();
-  renderPlayer();
+  if (state.done) {
+    document.getElementById('player-name').textContent = 'Desafio diário concluído';
+    document.getElementById('btn-next').disabled = true;
+  } else {
+    renderPlayer();
+  }
   updateScore();
   renderDailyDots();
 
@@ -1694,10 +2348,10 @@ function renderDailyDots() {
   const container = document.getElementById('daily-dots');
   if (!container) return;
   container.innerHTML = '';
-  for (let i = 0; i < state.idx; i++) {
+  const attempts = Array.isArray(state.dailyAttempts) ? state.dailyAttempts : [];
+  for (let i = 0; i < attempts.length; i++) {
     const dot = document.createElement('div');
-    const v   = state.marcados[i];
-    dot.className = 'daily-dot ' + (v && v.nome ? 'hit' : v === false ? 'miss' : 'skip');
+    dot.className = 'daily-dot ' + attempts[i];
     container.appendChild(dot);
   }
 }
@@ -1718,14 +2372,15 @@ function buildShareText() {
   const saved = loadDailyState();
   if (!saved) return '';
   const hits = Object.values(saved.marcados).filter(v => v && v.nome).length;
+  const attempts = Array.isArray(saved.attempts) ? saved.attempts : [];
   let dots = '';
-  for (let i = 0; i < saved.idx; i++) {
-    const v = saved.marcados[i];
-    dots += (v && v.nome) ? '\uD83D\uDFE9' : (v === false ? '\uD83D\uDFE5' : '\u2B1C');
+  for (let i = 0; i < attempts.length; i++) {
+    const attempt = attempts[i];
+    dots += (attempt === 'hit') ? '\uD83D\uDFE9' : (attempt === 'miss' ? '\uD83D\uDFE5' : '\u2B1C');
   }
   let rows = '';
   for (let i = 0; i < dots.length; i += 16) rows += dots.slice(i, i+16) + '\n';
-  return '\u26BD Bingo de Futebol \u2014 ' + getDailyKey() + '\n' + hits + '/' + saved.idx + ' acertos\n\n' + rows.trim();
+  return '\u26BD Bingo de Futebol \u2014 ' + getDailyKey() + '\n' + hits + '/16 acertos\n\n' + rows.trim();
 }
 
 function copyShare() {
